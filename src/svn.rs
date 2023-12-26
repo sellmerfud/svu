@@ -1,0 +1,290 @@
+
+use std::env;
+use std::sync::OnceLock;
+use std::process::{Command, Output};
+use std::path::Path;
+use chrono::{DateTime, Local};
+use roxmltree::{Document, Node};
+use anyhow::Result;
+use crate::util;
+use crate::util::SvError::{SvnError, self};
+use regex::Regex;
+use std::fmt::Display;
+
+
+//  Get the name of the svn command to run
+//  Use "svn" (on the path as the default)
+fn svn_cmd() -> &'static String {
+    static SVN_CMD: OnceLock<String> = OnceLock::new();
+    SVN_CMD.get_or_init(|| {
+        env::var("SV_SVN").map(|s| s.clone()).unwrap_or("svn".to_string())
+    })
+}
+
+#[derive(Debug, Clone)]
+pub struct FromPath {
+    pub path: String,
+    pub revision: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct LogPath {
+    pub path: String,
+    pub kind: String,
+    pub action: String,
+    pub text_mods: bool,
+    pub prop_mods: bool,
+    pub from_path: Option<FromPath>,
+}
+#[derive(Debug, Clone)]
+pub struct LogEntry {
+    pub revision: String,
+    pub author:   String,
+    pub date:     DateTime<Local>,
+    pub msg:      Vec<String>,
+    pub paths:    Vec<LogPath>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SvnInfo {
+    pub path:           String,
+    pub repo_rev:       String,
+    pub kind:           String,
+    pub size:           Option<u64>,
+    pub url:            String,
+    pub rel_url:        String,
+    pub root_url:       String,
+    pub repo_uuid:      String,
+    pub commit_rev:     String,
+    pub commit_author:  String,
+    pub commit_date:    DateTime<Local>,
+    pub wc_path:        Option<String>,  
+}
+
+fn run_svn<P>(args: &Vec<String>, cwd: Option<P>) -> Result<Output>
+    where P: AsRef<Path>
+{
+    let mut cmd = Command::new(svn_cmd());
+    if let Some(dir) = cwd {
+        cmd.current_dir(dir);
+    }
+    Ok(cmd.args(args)
+          .output()?)
+}
+
+pub const CWD: Option<&Path> = None;
+
+fn get_attr(n: &Node, name: &str) -> String { 
+    n.attribute(name).unwrap().to_owned()
+}
+
+fn attr_is(n: &Node, name: &str, target: &str) -> bool { 
+    n.attribute(name).map(|a| a == target).unwrap_or(false)
+}
+
+fn get_text(n: &Node) -> String { 
+    match n.first_child() {
+        Some(node) => node.text().unwrap().to_owned(),
+        None => "".to_owned()
+    }
+}
+
+fn get_child<'a, 'i>(parent: &Node<'a, 'i>, name: &str) -> Option<Node<'a, 'i>> {
+    parent.children().find(|c| c.has_tag_name(name))
+}
+
+fn get_child_text(parent: &Node, name: &str) -> Option<String> {
+    parent.children().find(|n| n.has_tag_name(name))
+                     .map(|n| get_text(&n))
+}
+
+fn get_child_text_or(parent: &Node, name: &str, default: &str) -> String {
+    parent.children().find(|n| n.has_tag_name(name))
+                     .map(|n| get_text(&n))
+                     .unwrap_or(default.to_owned())
+}
+
+
+
+fn rev_re() -> &'static Regex {
+    static REV: OnceLock<Regex> = OnceLock::new();
+    REV.get_or_init(|| {
+        Regex::new(r"^(\d+|HEAD|BASE|PREV|COMMITTED)(?::(\d+|HEAD|BASE|PREV|COMMITTED)|([+-])(\d+))?$")
+                .expect("Error parsing REV regular expression")
+    })
+}
+
+
+pub fn looks_like_revision(text: &str) -> bool {
+    rev_re().is_match(text)
+}
+
+//  Resolve a revision string entered by the user.
+//  If the string contains a revision keyword or if it contains a delta expression
+//  then we must use svn log to get the actual revsion.
+//  In order to resovle the string using svn log we need a working copy path.
+pub fn resolve_revision_string(rev_string: &str, path: &str) -> Result<String> {
+    match rev_re().captures(rev_string) {
+        None => {
+            let msg = format!("Cannot resolve revision from {} for path {}", rev_string, path);
+            Err(SvError::General(msg).into())
+        }
+        Some(caps) => {
+            let result = match (caps.get(1), caps.get(2), caps.get(3), caps.get(4)) {
+                (Some(_), None, None, None)              => rev_string.to_owned(),
+                (Some(_), Some(_), None, None)           => rev_string.to_owned(),
+                (Some(rev), None, Some(op), Some(delta)) => {
+                    let test_rev = if op.as_str() == "-"  { format!("{}:0", rev.as_str())} else { format!("{}:HEAD", rev.as_str()) };
+                    let revs = vec![test_rev.as_str()];
+                    let limit = Some(delta.as_str().parse::<u16>().unwrap() + 1);
+                    let entries = log(&vec![path], &revs, false, limit, false, false)?;
+                    entries.last().unwrap().revision.to_owned()
+               }
+               _ => unreachable!("resolve_revision_string, fell through match!")
+            };
+            Ok(result)
+        }
+    }
+}
+
+fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
+    let mut entries: Vec<SvnInfo> = vec![];
+    let doc = Document::parse(text)?;
+    for entry in doc.descendants().filter(|n| n.has_tag_name("entry")) {
+        let commit  = get_child(&entry, "commit").unwrap();
+        let repo    = get_child(&entry, "repository").unwrap();
+        let wc_info = get_child(&entry, "wc-info");
+
+        let entry = SvnInfo {
+            path:          get_attr(&entry, "path"),
+            repo_rev:      get_attr(&entry, "revision"),
+            kind:          get_attr(&entry, "kind"),
+            size:          if entry.has_attribute("size") { Some(get_attr(&entry, "size").parse::<u64>()?) } else { None },
+            url:           get_child_text_or(&entry, "url", "n/a"),
+            rel_url:       get_child_text_or(&entry, "relative-url", "n/a"),
+            root_url:      get_child_text_or(&repo, "relative-url", "n/a"),
+            repo_uuid:     get_child_text_or(&repo, "uuid", "n/a"),
+            commit_rev:    get_attr(&commit, "revision"),
+            commit_author: get_child_text_or(&commit, "author", "n/a"),
+            commit_date:   util::parse_svn_date(get_child_text(&commit, "date").unwrap().as_str()),
+
+            wc_path: wc_info.map(|x| get_child_text_or(&x, "wcroot-abspath", "n/a")),
+        };
+        entries.push(entry);
+    }
+    Ok(entries)
+}
+
+pub fn info<S>(path: S, revision: Option<S>) -> Result<SvnInfo>
+    where S: AsRef<str> + Display {
+
+    let mut args = Vec::<String>::new();
+    args.extend(vec!["info".to_string(), "--xml".to_string()]);
+    if let Some(rev) = revision {
+        args.push(format!("--revision={}", rev));
+    }
+    args.push(path.to_string());
+    let output = run_svn(&args, CWD)?;
+    if output.status.success() {
+        let text = String::from_utf8_lossy(&output.stdout);
+        let info = parse_svn_info(&text)?;
+        Ok(info[0].clone())
+    }
+    else {
+        Err(SvnError(output).into())
+    }
+}
+
+pub fn info_list<S>(paths: &Vec<String>, revision: Option<S>) -> Result<Vec<SvnInfo>> 
+    where S: AsRef<str> + Display {
+
+        let mut args = Vec::<String>::new();
+        args.extend(vec!["info".to_string(), "--xml".to_string()]);
+        if let Some(rev) = revision {
+            args.push(format!("--revision={}", rev));
+        }
+        args.extend(paths.to_vec());
+        let output = run_svn(&args, CWD)?;
+        if output.status.success() {
+            let text = String::from_utf8_lossy(&output.stdout);
+            parse_svn_info(&text)
+        }
+        else {
+            Err(SvnError(output).into())
+        }
+}
+
+fn get_log_entry_paths(log_entry: &Node) -> Vec<LogPath> {
+    let mut paths: Vec<LogPath> = vec![];
+    for path_node in log_entry.descendants().filter(|n| n.has_tag_name("path")) {
+        let from_path = if path_node.has_attribute("copyfrom-path") {
+            Some(FromPath {
+                    path:     get_attr(&path_node, "copyfrom-path"),
+                    revision: get_attr(&path_node, "copyfrom-rev")
+                })
+        }
+        else {
+            None
+        };
+
+        let log_path = LogPath {
+            path:      get_text(&path_node),
+            kind:      get_attr(&path_node, "kind"),
+            action:    get_attr(&path_node, "action"),
+            text_mods: attr_is(&path_node, "text-mods", "true"),
+            prop_mods: attr_is(&path_node, "prop-mods", "true"),
+            from_path: from_path        
+        };
+
+        paths.push(log_path);
+    }
+
+    paths
+}
+
+
+fn parse_svn_log(text: &str) -> Result<Vec<LogEntry>> {
+    let mut entries: Vec<LogEntry> = vec![];
+    let doc = Document::parse(text)?;
+    for log_entry in doc.descendants().filter(|n| n.has_tag_name("logentry")) {
+
+        let entry = LogEntry {
+            revision: get_attr(&log_entry, "revision"),
+            author:   get_child_text_or(&log_entry, "author", "n/a"),
+            date:     util::parse_svn_date(get_child_text(&log_entry, "date").unwrap().as_str()),
+            msg:      get_child_text_or(&log_entry, "msg", "").split("\n").map(|s| s.to_owned()).collect(),
+            paths:    get_log_entry_paths(&log_entry)
+        };
+        entries.push(entry);
+    }
+    Ok(entries)
+}
+
+//  Run the svn log command
+pub fn log<S>(
+    paths: &Vec<S>,
+    revisions: &Vec<S>,
+    include_msg: bool,
+    limit: Option<u16>,
+    stop_on_copy: bool,
+    include_paths: bool) -> Result<Vec<LogEntry>>
+        where S: AsRef<str> + Display
+    {
+
+    let mut args = Vec::<String>::new();
+    args.extend(vec!["log".to_string(), "--xml".to_string()]);
+    if !include_msg  { args.push("--quiet".to_string()) }
+    if stop_on_copy  { args.push("--stop-on_copy".to_string()) }
+    if include_paths { args.push("--verbose".to_string()) }
+    args.extend(limit.into_iter().map(|l| format!("--limit={}", l)));
+    args.extend(revisions.into_iter().map(|r| format!("--revision={}", r)));
+    args.extend(paths.into_iter().map(|p| p.to_string()));
+    let output = run_svn(&args, CWD)?;
+    if output.status.success() {
+        let text = String::from_utf8_lossy(&output.stdout);
+        parse_svn_log(&text)
+    }
+    else {
+        Err(SvnError(output).into())
+    }
+}
