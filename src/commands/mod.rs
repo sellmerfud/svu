@@ -8,10 +8,12 @@ pub trait SvCommand {
 }
 
 pub mod log;
+pub mod ignore;
 
 /// Return a vector of all of the svn subcommands.
 pub fn sub_commands<'a>() -> Vec<&'a dyn SvCommand> {
     vec![
-        &log::Log
+        &log::Log,
+        &ignore::Ignore
     ]
 }

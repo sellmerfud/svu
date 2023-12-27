@@ -1,11 +1,9 @@
 
-use std::path;
-
 use regex::Regex;
 use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
 use crate::svn::{self, LogEntry};
-use crate::util;
+use crate::util::{self, StringWrapper};
 use colored::*;
 use chrono::{DateTime, Local};
 use super::SvCommand;
@@ -19,7 +17,6 @@ struct Options {
     full:         bool,
     show_paths:   bool,
     stop_on_copy: bool,
-    incoming:     bool,
     reverse:      bool,
     revisions:    Vec<String>,
     regexes:      Vec<Regex>,
@@ -56,7 +53,6 @@ impl Options {
             date:         matches.get_flag("date"),
             reverse:      matches.get_flag("reverse"),
             show_paths:   matches.get_flag("show-paths"),
-            incoming:     matches.get_flag("incoming"),
             stop_on_copy: matches.get_flag("stop-on-copy"),
             limit:        matches.get_one::<u16>("limit").copied(),
             revisions,
@@ -231,9 +227,7 @@ impl Log {
         fn parent_dir(path: &str) -> String {
             let re = Regex::new(r"^(.*)/[^/]+").expect("Error parsing parent_dir regex");
             let mut local_path = path.to_owned();
-            if local_path.ends_with('/') {
-                local_path.pop();
-            }
+            local_path = local_path.chomp('/').to_owned();
 
             if let Some(caps) = re.captures(&local_path) {
                 caps[1].to_owned()

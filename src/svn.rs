@@ -6,8 +6,8 @@ use std::path::Path;
 use chrono::{DateTime, Local};
 use roxmltree::{Document, Node};
 use anyhow::Result;
-use crate::util;
 use crate::util::SvError::{SvnError, self};
+use crate::util::{parse_svn_date_opt, null_date};
 use regex::Regex;
 use std::fmt::Display;
 
@@ -61,21 +61,36 @@ pub struct SvnInfo {
     pub wc_path:        Option<String>,  
 }
 
-fn run_svn<P>(args: &Vec<String>, cwd: Option<P>) -> Result<Output>
+#[derive(Debug, Clone)]
+pub struct ListEntry {
+    pub name:          String,
+    pub kind:          String,
+    pub size:          Option<u64>,
+    pub commit_rev:    String,
+    pub commit_author: String,
+    pub commit_date:   DateTime<Local>
+}
+
+#[derive(Debug, Clone)]
+pub struct SvnList {
+    pub path:    String,
+    pub entries: Vec<ListEntry>
+}
+
+pub fn run_svn<P>(args: &Vec<String>, cwd: Option<P>) -> Result<Output>
     where P: AsRef<Path>
 {
     let mut cmd = Command::new(svn_cmd());
     if let Some(dir) = cwd {
         cmd.current_dir(dir);
     }
-    Ok(cmd.args(args)
-          .output()?)
+    Ok(cmd.args(args).output()?)
 }
 
 pub const CWD: Option<&Path> = None;
 
 fn get_attr(n: &Node, name: &str) -> String { 
-    n.attribute(name).unwrap().to_owned()
+    n.attribute(name).unwrap_or("").to_owned()
 }
 
 fn attr_is(n: &Node, name: &str, target: &str) -> bool { 
@@ -136,7 +151,7 @@ pub fn resolve_revision_string(rev_string: &str, path: &str) -> Result<String> {
                 (Some(rev), None, Some(op), Some(delta)) => {
                     let test_rev = if op.as_str() == "-"  { format!("{}:0", rev.as_str())} else { format!("{}:HEAD", rev.as_str()) };
                     let revs = vec![test_rev.as_str()];
-                    let limit = Some(delta.as_str().parse::<u16>().unwrap() + 1);
+                    let limit = delta.as_str().parse::<u16>().ok().map(|v| v + 1);
                     let entries = log(&vec![path], &revs, false, limit, false, false)?;
                     entries.last().unwrap().revision.to_owned()
                }
@@ -159,14 +174,14 @@ fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
             path:          get_attr(&entry, "path"),
             repo_rev:      get_attr(&entry, "revision"),
             kind:          get_attr(&entry, "kind"),
-            size:          if entry.has_attribute("size") { Some(get_attr(&entry, "size").parse::<u64>()?) } else { None },
+            size:          get_attr(&entry, "size").parse::<u64>().ok(),
             url:           get_child_text_or(&entry, "url", "n/a"),
             rel_url:       get_child_text_or(&entry, "relative-url", "n/a"),
             root_url:      get_child_text_or(&repo, "relative-url", "n/a"),
             repo_uuid:     get_child_text_or(&repo, "uuid", "n/a"),
             commit_rev:    get_attr(&commit, "revision"),
             commit_author: get_child_text_or(&commit, "author", "n/a"),
-            commit_date:   util::parse_svn_date(get_child_text(&commit, "date").unwrap().as_str()),
+            commit_date:   parse_svn_date_opt(get_child_text(&commit, "date")),
 
             wc_path: wc_info.map(|x| get_child_text_or(&x, "wcroot-abspath", "n/a")),
         };
@@ -178,7 +193,7 @@ fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
 pub fn info<S>(path: S, revision: Option<S>) -> Result<SvnInfo>
     where S: AsRef<str> + Display {
 
-    let mut args = Vec::<String>::new();
+    let mut args = Vec::new();
     args.extend(vec!["info".to_string(), "--xml".to_string()]);
     if let Some(rev) = revision {
         args.push(format!("--revision={}", rev));
@@ -198,7 +213,7 @@ pub fn info<S>(path: S, revision: Option<S>) -> Result<SvnInfo>
 pub fn info_list<S>(paths: &Vec<String>, revision: Option<S>) -> Result<Vec<SvnInfo>> 
     where S: AsRef<str> + Display {
 
-        let mut args = Vec::<String>::new();
+        let mut args = Vec::new();
         args.extend(vec!["info".to_string(), "--xml".to_string()]);
         if let Some(rev) = revision {
             args.push(format!("--revision={}", rev));
@@ -243,6 +258,7 @@ fn get_log_entry_paths(log_entry: &Node) -> Vec<LogPath> {
 }
 
 
+
 fn parse_svn_log(text: &str) -> Result<Vec<LogEntry>> {
     let mut entries: Vec<LogEntry> = vec![];
     let doc = Document::parse(text)?;
@@ -251,7 +267,7 @@ fn parse_svn_log(text: &str) -> Result<Vec<LogEntry>> {
         let entry = LogEntry {
             revision: get_attr(&log_entry, "revision"),
             author:   get_child_text_or(&log_entry, "author", "n/a"),
-            date:     util::parse_svn_date(get_child_text(&log_entry, "date").unwrap().as_str()),
+            date:     parse_svn_date_opt(get_child_text(&log_entry, "date")),
             msg:      get_child_text_or(&log_entry, "msg", "").split("\n").map(|s| s.to_owned()).collect(),
             paths:    get_log_entry_paths(&log_entry)
         };
@@ -271,7 +287,7 @@ pub fn log<S>(
         where S: AsRef<str> + Display
     {
 
-    let mut args = Vec::<String>::new();
+    let mut args = Vec::new();
     args.extend(vec!["log".to_string(), "--xml".to_string()]);
     if !include_msg  { args.push("--quiet".to_string()) }
     if stop_on_copy  { args.push("--stop-on_copy".to_string()) }
@@ -287,4 +303,64 @@ pub fn log<S>(
     else {
         Err(SvnError(output).into())
     }
+}
+
+
+fn parse_svn_list(text: &str) -> Result<Vec<SvnList>> {
+    let mut path_lists: Vec<SvnList> = vec![];
+    let doc = Document::parse(text)?;
+    for list_node in doc.descendants().filter(|n| n.has_tag_name("list")) {
+        let path = get_attr(&list_node, "path");
+        let mut entries: Vec<ListEntry> = vec![];
+
+        for entry_node in list_node.children().filter(|n| n.has_tag_name("entry")) {
+            let (commit_rev, commit_author, commit_date) =
+                if let Some(commit_node) = get_child(&entry_node, "commit") {
+                    (get_attr(&commit_node, "revision"),
+                    get_child_text_or(&commit_node, "author", "n/a"),
+                    parse_svn_date_opt(get_child_text(&commit_node, "date")))
+
+                }
+                else {
+                    ("n/a".to_owned(), "n/a".to_owned(), *null_date())
+                };
+            let entry = ListEntry {
+                name: get_child_text_or(&entry_node, "name", ""),
+                kind: get_attr(&entry_node, "kind"),
+                size: get_child_text(&entry_node, "size").map(|s| s.parse::<u64>().unwrap()),
+                commit_rev,
+                commit_author,
+                commit_date,
+            };
+            entries.push(entry);
+        }
+        path_lists.push(SvnList { path, entries });
+    }
+    Ok(path_lists)
+}
+
+
+// Get svn list for multiple paths
+pub fn path_lists(paths: &Vec<String>) -> Result<Vec<SvnList>> {
+    if paths.is_empty() {
+        Ok(vec![])
+    }
+    else {
+        let mut args = vec!["list".to_owned(), "--xml".to_owned()];
+        args.extend(paths.into_iter().map(|p| p.to_string()));
+        let output = run_svn(&args, CWD)?;
+        if output.status.success() {
+            let text = String::from_utf8_lossy(&output.stdout);
+            parse_svn_list(&text)
+        }
+        else {
+            Err(SvnError(output).into())
+        }   
+    }
+}
+
+//  Get svn list for a single path.
+pub fn path_list(path: &str) -> Result<SvnList> {
+    let mut xx = path_lists(&vec![path.to_owned()])?;
+    Ok(xx.remove(0))
 }
