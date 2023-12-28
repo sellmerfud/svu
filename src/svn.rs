@@ -364,3 +364,21 @@ pub fn path_list(path: &str) -> Result<SvnList> {
     let mut xx = path_lists(&vec![path.to_owned()])?;
     Ok(xx.remove(0))
 }
+
+pub fn change_diff(path: &String, commit_rev: &String) -> Result<Vec<String>> {
+    let args = vec![
+        "diff".to_string(),
+        "--change".to_string(),
+        commit_rev.clone(),
+        path.clone()
+    ];
+
+    let output = run_svn(&args, CWD)?;
+    if output.status.success() {
+        let text = String::from_utf8_lossy(&output.stdout);
+        Ok(text.split("\n").map(|l| l.to_string()).collect())
+    }
+    else {
+        Err(SvnError(output).into())
+    }   
+}

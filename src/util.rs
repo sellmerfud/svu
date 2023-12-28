@@ -1,6 +1,6 @@
 
 use thiserror::Error;
-use crate::svn::{LogPath, FromPath};
+use crate::svn::{LogPath, FromPath, LogEntry};
 use colored::*;
 use chrono::{DateTime, Local, NaiveDateTime};
 use std::sync::OnceLock;
@@ -91,3 +91,59 @@ pub fn display_svn_datetime(date: &DateTime<Local>) -> String {
         format!("{} {}", display_svn_date(date), display_svn_time(date))
     }
 }
+
+//  Print formatted commit info to stdout.
+pub fn show_commit(log_entry: &LogEntry, show_msg: bool, show_paths: bool) -> () {
+    println!("-------------------------------------------------------------------");
+    println!("Commit: {}", log_entry.revision.yellow());
+    println!("Author: {}", log_entry.author.cyan());
+    println!("Date  : {}", display_svn_datetime(&log_entry.date).magenta());
+    println!("-------------------------------------------------------------------");
+
+    if show_msg {
+        for line in &log_entry.msg {
+            println!(" {}", line);
+        }  
+    }
+    println!();
+
+    if log_entry.paths.len() > 0 {
+        struct Totals{ pub chg: u16, pub add:u16, pub del:u16, pub rep:u16 }
+        let mut totals = Totals { chg: 0, add: 0, del: 0, rep: 0};
+        
+        for path_entry in &log_entry.paths {
+            match path_entry.action.as_str() {
+                "M" => totals.chg += 1,
+                "A" => totals.add += 1,
+                "D" => totals.del += 1,
+                "R" => totals.rep += 1,
+                _   => ()
+            }
+        }
+        let label = if totals.chg == 1 { "file" } else { "files" };
+        let tot_line = format!("{} {} modified, {} added, {} deleted, {} replaced",
+            totals.chg, label, totals.add, totals.del, totals.rep);
+        println!("{}", tot_line.cyan());
+    }
+
+    if show_paths {
+        for path in &log_entry.paths {
+            println!("{}", formatted_log_path(path))           
+        }
+    }
+}
+
+pub fn print_diff_line(line: &String) -> () {
+    let color = if line.starts_with("---") { "blue" }
+           else if line.starts_with("+++") { "blue" }
+           else if line.starts_with("Index:") { "yellow" }
+           else if line.starts_with("==========") { "yellow" }
+           else if line.starts_with("Property changes on:") { "magenta" }
+           else if line.starts_with("+") { "green" }
+           else if line.starts_with("@@") { "gray" }
+           else if line.starts_with("-") { "red" }
+           else { "white" };
+
+    println!("{}", line.color(color));
+  }
+  

@@ -184,9 +184,7 @@ impl Log {
         if revisions.is_empty() && 
            !paths.is_empty() &&
            svn::looks_like_revision(paths[0].as_str()) {
-
-            revisions = vec![paths[0].clone()];
-            paths.remove(0);
+            revisions = vec![paths.remove(0)];
         };
 
         //  Resolve any revisions that contains names such as HEAD or
