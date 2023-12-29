@@ -220,7 +220,7 @@ fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
             size:          get_attr(&entry, "size").parse::<u64>().ok(),
             url:           get_child_text_or(&entry, "url", "n/a"),
             rel_url:       get_child_text_or(&entry, "relative-url", "n/a"),
-            root_url:      get_child_text_or(&repo, "relative-url", "n/a"),
+            root_url:      get_child_text_or(&repo, "root", "n/a"),
             repo_uuid:     get_child_text_or(&repo, "uuid", "n/a"),
             commit_rev:    get_attr(&commit, "revision"),
             commit_author: get_child_text_or(&commit, "author", "n/a"),

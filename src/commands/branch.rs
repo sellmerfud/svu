@@ -131,14 +131,14 @@ fn show_current_branch(options: &Options) -> Result<()> {
 
 fn show_list(options: &Options) -> Result<()> {
 
+    let base_url = svn::info(&options.path, None)?.root_url;
+
     if options.list_branches() {
-        list_entries("Branches", "http://gemini2.rocsoftware.com/svn/om", &vec!["branches".to_string()], &options.branch_regex)?
+        list_entries("Branches", &base_url, &vec!["branches".to_string()], &options.branch_regex)?
     }
-
     if options.list_tags() {
-        list_entries("Tags", "http://gemini2.rocsoftware.com/svn/om", &vec!["tags".to_string()], &options.tag_regex)?
+        list_entries("Tags", &base_url, &vec!["tags".to_string()], &options.tag_regex)?
     }
-
     Ok(())    
 }
 
