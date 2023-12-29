@@ -2,15 +2,16 @@
 use std::env;
 use std::sync::OnceLock;
 use std::process::{Command, Output};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::fs::{File, OpenOptions};
 use chrono::{DateTime, Local};
 use roxmltree::{Document, Node};
 use anyhow::Result;
-use crate::util::SvError::{SvnError, self};
-use crate::util::{parse_svn_date_opt, null_date};
+use crate::util::SvError::*;
+use crate::util::{parse_svn_date_opt, null_date, data_directory};
 use regex::Regex;
 use std::fmt::Display;
-
+use serde::{Deserialize, Serialize};
 
 //  Get the name of the svn command to run
 //  Use "svn" (on the path as the default)
@@ -142,7 +143,7 @@ pub fn resolve_revision_string(rev_string: &str, path: &str) -> Result<String> {
     match rev_re().captures(rev_string) {
         None => {
             let msg = format!("Cannot resolve revision from {} for path {}", rev_string, path);
-            Err(SvError::General(msg).into())
+            Err(General(msg).into())
         }
         Some(caps) => {
             let result = match (caps.get(1), caps.get(2), caps.get(3), caps.get(4)) {
@@ -158,6 +159,48 @@ pub fn resolve_revision_string(rev_string: &str, path: &str) -> Result<String> {
                _ => unreachable!("resolve_revision_string, fell through match!")
             };
             Ok(result)
+        }
+    }
+}
+
+
+pub fn workingcopy_root(working_dir: &Path) -> Option<PathBuf> {
+
+    fn find_it(path: &Path) -> Option<&Path> {
+        let mut target = PathBuf::from(path);
+        target.push(".svn");
+        if target.is_dir() {
+            Some(path)
+        }
+        else if let Some(parent) = path.parent() {
+            // Relative paths with a single component will return an emtpy parent
+            if parent == Path::new("") {
+                None
+            }
+            else {
+                find_it(parent)
+            }
+        }
+        else {
+            None
+        }
+    }
+
+    find_it(working_dir).map(|p| p.to_path_buf())
+}
+
+//  Returns the branch name and current commit revision
+//  for the given working copy path.
+pub fn current_branch(path: &Path) -> Result<(String, String)> {
+    match workingcopy_root(path) {
+        Some(wc_root) => {
+            let path_info = info(wc_root.to_string_lossy(), None)?;
+            Ok((path_info.rel_url, path_info.commit_rev))
+        }
+        None => {
+            let disp = path.to_string_lossy();
+            let msg = format!("{} is not part of a subversion working copy", disp.trim_end_matches("/."));
+            Err(General(msg).into())
         }
     }
 }
@@ -381,4 +424,46 @@ pub fn change_diff(path: &String, commit_rev: &String) -> Result<Vec<String>> {
     else {
         Err(SvnError(output).into())
     }   
+}
+
+fn prefixes_file() -> Result<PathBuf> {
+    match data_directory() {
+        Ok(dir) => Ok(dir.join("prefixes.json")),
+        e @Err(_) => e.into()
+    }
+}
+#[derive(Serialize, Deserialize)]
+pub struct Prefixes {
+    #[serde(rename(serialize = "trunkPrefix", deserialize = "trunkPrefix"))]
+    pub trunk_prefix:    String,
+    #[serde(rename(serialize = "branchPrefixes", deserialize = "branchPrefixes"))]
+    pub branch_prefixes: Vec<String>,
+    #[serde(rename(serialize = "tagPrefixes", deserialize = "tagPrefixes"))]
+    pub tag_prefixes:    Vec<String>
+}
+
+pub fn load_prefixes() -> Result<Prefixes> {
+    let path = prefixes_file()?;
+    if path.is_file() {
+        let reader = File::open(path)?;
+        let prefixes: Prefixes = serde_json::from_reader(reader)?;
+        Ok(prefixes)
+    } else {
+        //  Return the defaults
+        Ok(Prefixes {
+            trunk_prefix:    "trunk".to_string(),
+            branch_prefixes: vec!["branches".to_string()],
+            tag_prefixes:    vec!["tags".to_string()],
+        })
+    }
+}
+
+pub fn save_prefixes(prefixes: &Prefixes) -> Result<()> {
+    let writer = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(prefixes_file()?)?;
+
+    Ok(serde_json::to_writer_pretty(writer, prefixes)?)
 }

@@ -1,9 +1,13 @@
 
 use thiserror::Error;
-use crate::svn::{LogPath, FromPath, LogEntry};
+use crate::svn::{self, LogPath, FromPath, LogEntry};
 use colored::*;
 use chrono::{DateTime, Local, NaiveDateTime};
 use std::sync::OnceLock;
+use std::path::PathBuf;
+use std::env::current_dir;
+use std::fs::create_dir;
+use anyhow::Result;
 
 #[derive(Error, Debug)]
 pub enum SvError {
@@ -32,6 +36,25 @@ pub fn join_paths<S, T>(base: S, leaf: T) -> String
     path += leaf.as_ref().trim_matches('/');
     path
 }
+
+//  We create a .sv directory in the top directory of the working copy
+//  This gives sv commands a place to store data
+//  This will throw an error of the directory cannot be resloved.
+pub fn data_directory<'a>() -> Result<PathBuf> {
+    if let Some(wc_root) = svn::workingcopy_root(&current_dir()?) {
+        let path = wc_root.join(".sv");
+        if !path.is_dir() {
+            create_dir(path.as_path())?
+        }
+        Ok(path)
+    }
+    else {
+        let msg = "You must run this command from within a subversion working copy directory";
+        Err(SvError::General(msg.to_string()).into())
+    }
+}
+
+
 
 
 pub fn formatted_log_path(log_path: &LogPath) -> String {
@@ -145,5 +168,4 @@ pub fn print_diff_line(line: &String) -> () {
            else { "white" };
 
     println!("{}", line.color(color));
-  }
-  
+}

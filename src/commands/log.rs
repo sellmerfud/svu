@@ -169,145 +169,142 @@ impl SvCommand for Log {
     }
         
     fn run(&self, matches: &ArgMatches) -> Result<()> {
-        Log::show_results(&Options::build_options(matches))
+        show_results(&Options::build_options(matches))
     }
 }
 
-impl Log {
+fn get_log_entries(options: &Options) -> Result<Vec<LogEntry>> {
+    let mut revisions = options.revisions.clone();
+    let mut paths = options.paths.clone();
+    
+    //  If no revisions are specified and the first 'path' looks like a revision
+    //  then treat it as one, appending :0 if it does not have a range.
+    if revisions.is_empty() && 
+        !paths.is_empty() &&
+        svn::looks_like_revision(paths[0].as_str()) {
+        revisions = vec![paths.remove(0)];
+    };
 
-    fn get_log_entries(options: &Options) -> Result<Vec<LogEntry>> {
-        let mut revisions = options.revisions.clone();
-        let mut paths = options.paths.clone();
-        
-        //  If no revisions are specified and the first 'path' looks like a revision
-        //  then treat it as one, appending :0 if it does not have a range.
-        if revisions.is_empty() && 
-           !paths.is_empty() &&
-           svn::looks_like_revision(paths[0].as_str()) {
-            revisions = vec![paths.remove(0)];
+    //  Resolve any revisions that contains names such as HEAD or
+    // that contain rev-3 type expressions.
+    let resolve_path = paths.first().map(|p| p.as_str()).unwrap_or(".");
+    revisions = revisions.into_iter().flat_map(|r| {
+        svn::resolve_revision_string(r.as_str(), resolve_path)
+    }).collect();
+
+    if revisions.len() == 1 && !revisions[0].contains(':') {
+        revisions[0] = format!("{}:0", revisions[0]);
+    }
+
+    let entries = svn::log(
+        &paths,
+        &revisions,
+        true,  // include_msg
+        options.limit,
+        options.stop_on_copy,
+        options.show_paths)?;
+
+    //  Check any regular expressions entered by the user.
+    //  Include the entry if it matches at least one of them.
+    if options.regexes.is_empty() {
+        Ok(entries)
+    } else {
+        let matching = |entry: &LogEntry| -> bool {
+            let msg = entry.msg.join("\n");
+            options.regexes.iter().any(|r| r.is_match(msg.as_str()))
         };
+        let new_entries = entries.into_iter().filter(matching).collect();
+        Ok(new_entries)
+    }
+}
 
-        //  Resolve any revisions that contains names such as HEAD or
-        // that contain rev-3 type expressions.
-        let resolve_path = paths.first().map(|p| p.as_str()).unwrap_or(".");
-        revisions = revisions.into_iter().flat_map(|r| {
-            svn::resolve_revision_string(r.as_str(), resolve_path)
-        }).collect();
+fn show_results(options: &Options) -> Result<()> {
 
-        if revisions.len() == 1 && !revisions[0].contains(':') {
-            revisions[0] = format!("{}:0", revisions[0]);
+    fn parent_dir(path: &str) -> String {
+        let re = Regex::new(r"^(.*)/[^/]+").expect("Error parsing parent_dir regex");
+        let mut local_path = path.to_owned();
+        local_path = local_path.chomp('/').to_owned();
+
+        if let Some(caps) = re.captures(&local_path) {
+            caps[1].to_owned()
         }
-
-        let entries = svn::log(
-            &paths,
-            &revisions,
-            true,  // include_msg
-            options.limit,
-            options.stop_on_copy,
-            options.show_paths)?;
-
-        //  Check any regular expressions entered by the user.
-        //  Include the entry if it matches at least one of them.
-        if options.regexes.is_empty() {
-            Ok(entries)
-        } else {
-            let matching = |entry: &LogEntry| -> bool {
-                let msg = entry.msg.join("\n");
-                options.regexes.iter().any(|r| r.is_match(msg.as_str()))
-            };
-            let new_entries = entries.into_iter().filter(matching).collect();
-            Ok(new_entries)
+        else {
+            ".".to_owned()
         }
     }
 
-    fn show_results(options: &Options) -> Result<()> {
+    let mut entries = get_log_entries(options)?;
 
-        fn parent_dir(path: &str) -> String {
-            let re = Regex::new(r"^(.*)/[^/]+").expect("Error parsing parent_dir regex");
-            let mut local_path = path.to_owned();
-            local_path = local_path.chomp('/').to_owned();
+    //  In the case where we are showing `incoming` commits
+    //  we will have a single revision of "HEAD:BASE".
+    //  It it possible that the "BASE" revision already exists
+    //  in the working copy and thus will not be `incoming` so
+    //  we do not want to display it.
+    let omit_rev = if !entries.is_empty() &&
+                        options.revisions.len() == 1 &&
+                        options.revisions[0] == "HEAD:BASE" {
+        let wc_path = options.paths.first().map(|p| p.as_str()).unwrap_or(".");
+        let path_info = svn::info(wc_path, None)?;
+        if path_info.kind == "dir" {
+            Some(path_info.commit_rev)
+        } else {
+            let parent_info = svn::info(&parent_dir(&wc_path), None)?;
+            Some(parent_info.commit_rev)
+        }
+    } else {
+        None
+    };
+    
+    //  Get the length of the longest revision string and author name
+    let (max_rev_len, max_author_len) = entries.iter().fold((0, 0), |(max_r, max_a), e| {
+        (max_r.max(e.revision.len()), max_a.max(e.author.len()))
+    });
 
-            if let Some(caps) = re.captures(&local_path) {
-                caps[1].to_owned()
+    let build_prefix = |revision: &String, author: &String, date: &DateTime<Local>| -> String {
+
+        let rev_str    = format!("{:width$}", revision.yellow(), width=max_rev_len);
+        let author_str = format!("{:width$}", author.cyan(), width=max_author_len);
+        let date_str   = if options.time {
+            util::display_svn_datetime(date).magenta()
+        } else {
+            util::display_svn_date(date).magenta()
+        };
+
+
+        match (options.author, options.date||options.time) {
+            (true, true) => format!("{} {} {}", rev_str, author_str, date_str),
+            (true, false) => format!("{} {}", rev_str, author_str),
+            (false, true) => format!("{} {}", rev_str, date_str),
+            (false, false)=> rev_str
+        }
+    };
+
+    if options.reverse {
+        entries.reverse();
+    }
+    
+    for LogEntry { revision, author, date, msg, paths } in &entries {
+        if Some(revision) != omit_rev.as_ref() {
+            let msg_1st = msg.first().map(|s| s.as_str()).unwrap_or("");
+            let prefix  = build_prefix(revision, author, date);
+
+            if options.full {
+                println!("\n{}", prefix);
+                for line in msg {
+                    println!("{}", line);
+                }
             }
             else {
-                ".".to_owned()
+                println!("{} {}", prefix, msg_1st);
             }
-        }
 
-        let mut entries = Self::get_log_entries(options)?;
-
-        //  In the case where we are showing `incoming` commits
-        //  we will have a single revision of "HEAD:BASE".
-        //  It it possible that the "BASE" revision already exists
-        //  in the working copy and thus will not be `incoming` so
-        //  we do not want to display it.
-        let omit_rev = if !entries.is_empty() &&
-                          options.revisions.len() == 1 &&
-                          options.revisions[0] == "HEAD:BASE" {
-            let wc_path = options.paths.first().map(|p| p.as_str()).unwrap_or(".");
-            let path_info = svn::info(wc_path, None)?;
-            if path_info.kind == "dir" {
-                Some(path_info.commit_rev)
-            } else {
-                let parent_info = svn::info(&parent_dir(&wc_path), None)?;
-                Some(parent_info.commit_rev)
-            }
-        } else {
-            None
-        };
-        
-        //  Get the length of the longest revision string and author name
-        let (max_rev_len, max_author_len) = entries.iter().fold((0, 0), |(max_r, max_a), e| {
-            (max_r.max(e.revision.len()), max_a.max(e.author.len()))
-        });
-
-        let build_prefix = |revision: &String, author: &String, date: &DateTime<Local>| -> String {
-
-            let rev_str    = format!("{:width$}", revision.yellow(), width=max_rev_len);
-            let author_str = format!("{:width$}", author.cyan(), width=max_author_len);
-            let date_str   = if options.time {
-                util::display_svn_datetime(date).magenta()
-            } else {
-                util::display_svn_date(date).magenta()
-            };
-
-
-            match (options.author, options.date||options.time) {
-                (true, true) => format!("{} {} {}", rev_str, author_str, date_str),
-                (true, false) => format!("{} {}", rev_str, author_str),
-                (false, true) => format!("{} {}", rev_str, date_str),
-                (false, false)=> rev_str
-            }
-        };
-
-        if options.reverse {
-            entries.reverse();
-        }
-        
-        for LogEntry { revision, author, date, msg, paths } in &entries {
-            if Some(revision) != omit_rev.as_ref() {
-                let msg_1st = msg.first().map(|s| s.as_str()).unwrap_or("");
-                let prefix  = build_prefix(revision, author, date);
-
-                if options.full {
-                    println!("\n{}", prefix);
-                    for line in msg {
-                        println!("{}", line);
-                    }
-                }
-                else {
-                    println!("{} {}", prefix, msg_1st);
-                }
-
-                if options.show_paths {
-                    for path in paths {
-                        println!("{}", util::formatted_log_path(path))
-                    }
+            if options.show_paths {
+                for path in paths {
+                    println!("{}", util::formatted_log_path(path))
                 }
             }
         }
-
-        Ok(())
     }
+
+    Ok(())
 }
