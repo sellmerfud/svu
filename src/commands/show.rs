@@ -113,7 +113,9 @@ impl SvCommand for Show {
         if options.show_diff {            
             println!();
             let lines = svn::change_diff(&paths[0], &log_entry.revision)?;
-            lines.iter().for_each(util::print_diff_line);
+            for line in &lines {
+                util::print_diff_line(line);
+            }
         }
         Ok(())
     }

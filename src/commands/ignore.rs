@@ -46,12 +46,12 @@ fn is_directory<S>(path: S) -> bool
         Path::new(path.as_ref()).is_dir()
 }
 
-fn is_working_directory(path: &String) -> Result<bool> {
+fn is_working_directory(path: &str) -> Result<bool> {
     let info = svn::info(path, None)?;
     Ok(info.wc_path.is_some() && info.kind == "dir")
 }
 
-fn get_ignores(path: &String, global: bool) -> Result<Option<String>> {
+fn get_ignores(path: &str, global: bool) -> Result<Option<String>> {
     let prop = (if global { "svn:global-ignores" } else { "svn:ignore" }).to_owned();
     let args = vec![
         "pget".to_owned(),
@@ -71,7 +71,7 @@ fn get_ignores(path: &String, global: bool) -> Result<Option<String>> {
 fn write_ignore_entries(options: &Options) -> Result<()> {
     let prefix_len = options.path.chomp('/').len() + 1; // Add one for trailing slash
 
-    fn svn_ignore(dir_path: &String, prefix_len: usize) -> Result<()> {
+    fn svn_ignore(dir_path: &str, prefix_len: usize) -> Result<()> {
         if let Some(ignore_output) = get_ignores(dir_path, false)? {
             let ignores = ignore_output
             .split("\n")
@@ -112,7 +112,7 @@ fn write_ignore_entries(options: &Options) -> Result<()> {
         }
 
         //  Recursively process all subdirectories
-        let path_list = svn::path_list(dir_path.as_str())?;
+        let path_list = svn::path_list(dir_path)?;
         for sub_dir in &path_list.entries {
             if sub_dir.kind == "dir" {
                 let subdir_path = util::join_paths(dir_path, sub_dir.name.chomp('/'));

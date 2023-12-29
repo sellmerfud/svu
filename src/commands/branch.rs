@@ -144,6 +144,8 @@ fn show_list(options: &Options) -> Result<()> {
 
 fn list_entries(header: &str, base_url: &str, prefixes: &Vec<String>, regex: &Option<Regex>) -> Result<()> {
     let all_prefixes = vec!["branches/".to_string(), "tags".to_string()];
+    //  If a path matches on of the branch/tag prefixes then we do not consider it
+    //  an acceptable entry.  Also the entry must match the regex if present.
     let acceptable = |path: &String| -> bool  {
         !all_prefixes.contains(path) && regex.as_ref().map(|r| r.is_match(path.as_str())).unwrap_or(true)
     };

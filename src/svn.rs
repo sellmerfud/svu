@@ -408,12 +408,12 @@ pub fn path_list(path: &str) -> Result<SvnList> {
     Ok(xx.remove(0))
 }
 
-pub fn change_diff(path: &String, commit_rev: &String) -> Result<Vec<String>> {
+pub fn change_diff(path: &str, commit_rev: &str) -> Result<Vec<String>> {
     let args = vec![
         "diff".to_string(),
         "--change".to_string(),
-        commit_rev.clone(),
-        path.clone()
+        commit_rev.to_string(),
+        path.to_string()
     ];
 
     let output = run_svn(&args, CWD)?;

@@ -260,7 +260,7 @@ fn show_results(options: &Options) -> Result<()> {
         (max_r.max(e.revision.len()), max_a.max(e.author.len()))
     });
 
-    let build_prefix = |revision: &String, author: &String, date: &DateTime<Local>| -> String {
+    let build_prefix = |revision: &str, author: &str, date: &DateTime<Local>| -> String {
 
         let rev_str    = format!("{:width$}", revision.yellow(), width=max_rev_len);
         let author_str = format!("{:width$}", author.cyan(), width=max_author_len);

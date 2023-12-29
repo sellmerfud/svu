@@ -156,7 +156,7 @@ pub fn show_commit(log_entry: &LogEntry, show_msg: bool, show_paths: bool) -> ()
     }
 }
 
-pub fn print_diff_line(line: &String) -> () {
+pub fn print_diff_line(line: &str) -> () {
     let color = if line.starts_with("---") { "blue" }
            else if line.starts_with("+++") { "blue" }
            else if line.starts_with("Index:") { "yellow" }
