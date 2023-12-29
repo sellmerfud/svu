@@ -3,7 +3,7 @@ use std::env;
 use std::sync::OnceLock;
 use std::process::{Command, Output};
 use std::path::{Path, PathBuf};
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use chrono::{DateTime, Local};
 use roxmltree::{Document, Node};
 use anyhow::Result;
@@ -459,11 +459,11 @@ pub fn load_prefixes() -> Result<Prefixes> {
 }
 
 pub fn save_prefixes(prefixes: &Prefixes) -> Result<()> {
-    let writer = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(prefixes_file()?)?;
-
+    // let writer = OpenOptions::new()
+    //     .write(true)
+    //     .truncate(true)
+    //     .create(true)
+    //     .open(prefixes_file()?)?;
+    let writer = File::create(prefixes_file()?)?;
     Ok(serde_json::to_writer_pretty(writer, prefixes)?)
 }
