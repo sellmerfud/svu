@@ -132,19 +132,21 @@ fn show_current_branch(options: &Options) -> Result<()> {
 fn show_list(options: &Options) -> Result<()> {
 
     let base_url = svn::info(&options.path, None)?.root_url;
+    let prefixes = svn::load_prefixes()?;
+    let mut all_prefixes = prefixes.branch_prefixes.clone();
+    all_prefixes.extend(prefixes.tag_prefixes.clone());
 
     if options.list_branches() {
-        list_entries("Branches", &base_url, &vec!["branches".to_string()], &options.branch_regex)?
+        list_entries("Branches", &base_url, &prefixes.branch_prefixes, &options.branch_regex, &all_prefixes)?
     }
     if options.list_tags() {
-        list_entries("Tags", &base_url, &vec!["tags".to_string()], &options.tag_regex)?
+        list_entries("Tags", &base_url, &prefixes.tag_prefixes, &options.tag_regex, &all_prefixes)?
     }
     Ok(())    
 }
 
-fn list_entries(header: &str, base_url: &str, prefixes: &Vec<String>, regex: &Option<Regex>) -> Result<()> {
-    let all_prefixes = vec!["branches/".to_string(), "tags".to_string()];
-    //  If a path matches on of the branch/tag prefixes then we do not consider it
+fn list_entries(header: &str, base_url: &str, prefixes: &Vec<String>, regex: &Option<Regex>, all_prefixes: &Vec<String>) -> Result<()> {
+    //  If a path matches one of the branch/tag prefixes then we do not consider it
     //  an acceptable entry.  Also the entry must match the regex if present.
     let acceptable = |path: &String| -> bool  {
         !all_prefixes.contains(path) && regex.as_ref().map(|r| r.is_match(path.as_str())).unwrap_or(true)
@@ -157,9 +159,9 @@ fn list_entries(header: &str, base_url: &str, prefixes: &Vec<String>, regex: &Op
     for prefix in prefixes {
         let path_list = svn::path_list(util::join_paths(base_url, prefix).as_str())?;
         for entry in path_list.entries {
-            let path = "^/".to_owned() + &util::join_paths(prefix, entry.name);
+            let path = &util::join_paths(prefix, entry.name);
             if acceptable(&path) {
-                println!("{}", path.green());
+                println!("{}{}", "^/".green(), path.green());
             }
         }
     }
