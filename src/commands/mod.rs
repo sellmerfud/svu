@@ -10,6 +10,7 @@ pub trait SvCommand {
 pub mod log;
 pub mod branch;
 pub mod show;
+pub mod filerevs;
 pub mod prefix;
 pub mod ignore;
 
@@ -19,6 +20,7 @@ pub fn sub_commands<'a>() -> Vec<&'a dyn SvCommand> {
         &log::Log,
         &branch::Branch,
         &show::Show,
+        &filerevs::FileRevs,
         &prefix::Prefix,
         &ignore::Ignore
     ]

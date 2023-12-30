@@ -137,10 +137,14 @@ fn show_list(options: &Options) -> Result<()> {
     all_prefixes.extend(prefixes.tag_prefixes.clone());
 
     if options.list_branches() {
-        list_entries("Branches", &base_url, &prefixes.branch_prefixes, &options.branch_regex, &all_prefixes)?
+        let mut sorted_prefixes = prefixes.branch_prefixes.clone();
+        sorted_prefixes.sort();
+        list_entries("Branches", &base_url, &sorted_prefixes, &options.branch_regex, &all_prefixes)?
     }
     if options.list_tags() {
-        list_entries("Tags", &base_url, &prefixes.tag_prefixes, &options.tag_regex, &all_prefixes)?
+        let mut sorted_prefixes = prefixes.tag_prefixes.clone();
+        sorted_prefixes.sort();
+        list_entries("Tags", &base_url, &sorted_prefixes, &options.tag_regex, &all_prefixes)?
     }
     Ok(())    
 }

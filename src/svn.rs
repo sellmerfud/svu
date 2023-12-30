@@ -194,7 +194,7 @@ pub fn workingcopy_root(working_dir: &Path) -> Option<PathBuf> {
 pub fn current_branch(path: &Path) -> Result<(String, String)> {
     match workingcopy_root(path) {
         Some(wc_root) => {
-            let path_info = info(wc_root.to_string_lossy(), None)?;
+            let path_info = info(wc_root.to_string_lossy().as_ref(), None)?;
             Ok((path_info.rel_url, path_info.commit_rev))
         }
         None => {
@@ -233,8 +233,8 @@ fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
     Ok(entries)
 }
 
-pub fn info<S>(path: S, revision: Option<S>) -> Result<SvnInfo>
-    where S: AsRef<str> + Display {
+pub fn info<'a>(path: &'a str, revision: Option<&'a str>) -> Result<SvnInfo>
+    {
 
     let mut args = Vec::new();
     args.extend(vec!["info".to_string(), "--xml".to_string()]);
