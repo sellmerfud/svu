@@ -139,11 +139,17 @@ fn prefix_operations(options: &Options) -> Result<()> {
     }
 
     if !options.add_branch.is_empty() || !options.rem_branch.is_empty() {
-        prefixes.branch_prefixes.extend(options.add_branch.iter().map(|e| e.clone()));
+        let to_add: Vec<String> = options.add_branch
+            .iter()
+            .filter(|a| !prefixes.branch_prefixes.contains(a))
+            .map(|e| e.clone()).collect();
+        prefixes.branch_prefixes.extend(to_add);
+
         prefixes.branch_prefixes = prefixes.branch_prefixes
             .into_iter()
             .filter(|e| !options.rem_branch.contains(&e))
             .collect();
+
         if prefixes.branch_prefixes.is_empty() {
             prefixes.branch_prefixes.push("branches".to_string());
         }
@@ -151,11 +157,17 @@ fn prefix_operations(options: &Options) -> Result<()> {
     }
 
     if !options.add_tag.is_empty() || !options.rem_tag.is_empty() {
-        prefixes.tag_prefixes.extend(options.add_tag.iter().map(|e| e.clone()));
+        let to_add: Vec<String> = options.add_tag
+            .iter()
+            .filter(|a| !prefixes.tag_prefixes.contains(a))
+            .map(|e| e.clone()).collect();
+        prefixes.tag_prefixes.extend(to_add);
+
         prefixes.tag_prefixes = prefixes.tag_prefixes
             .into_iter()
             .filter(|e| !options.rem_tag.contains(&e))
             .collect();
+        
         if prefixes.tag_prefixes.is_empty() {
             prefixes.tag_prefixes.push("tags".to_string());
         }

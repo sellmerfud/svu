@@ -1,5 +1,6 @@
 
 use std::env;
+use std::io::Write;
 use std::sync::OnceLock;
 use std::process::{Command, Output};
 use std::path::{Path, PathBuf};
@@ -46,6 +47,18 @@ pub struct LogEntry {
     pub paths:    Vec<LogPath>,
 }
 
+impl LogEntry {
+    // val msg1st = msg.headOption getOrElse ""
+    pub fn msg_1st(&self) -> String {
+        if self.msg.is_empty() {
+            "".to_string()
+        }
+        else {
+            self.msg[0].clone()
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SvnInfo {
     pub path:           String,
@@ -78,9 +91,21 @@ pub struct SvnList {
     pub entries: Vec<ListEntry>
 }
 
-pub fn run_svn<P>(args: &Vec<String>, cwd: Option<P>) -> Result<Output>
-    where P: AsRef<Path>
-{
+#[derive(Debug, Clone)]
+pub struct StatusEntry {
+    pub path: String,
+    pub item_status: String,
+    pub props_status: String,
+    pub revision: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SvnStatus {
+    pub path: String,
+    pub entries: Vec<StatusEntry>,
+}
+
+pub fn run_svn(args: &Vec<String>, cwd: Option<&Path>) -> Result<Output> {
     let mut cmd = Command::new(svn_cmd());
     if let Some(dir) = cwd {
         cmd.current_dir(dir);
@@ -303,7 +328,7 @@ fn get_log_entry_paths(log_entry: &Node) -> Vec<LogPath> {
 
 
 fn parse_svn_log(text: &str) -> Result<Vec<LogEntry>> {
-    let mut entries: Vec<LogEntry> = vec![];
+    let mut entries = vec![];
     let doc = Document::parse(text)?;
     for log_entry in doc.descendants().filter(|n| n.has_tag_name("logentry")) {
 
@@ -350,7 +375,7 @@ pub fn log<S>(
 
 
 fn parse_svn_list(text: &str) -> Result<Vec<SvnList>> {
-    let mut path_lists: Vec<SvnList> = vec![];
+    let mut path_lists = vec![];
     let doc = Document::parse(text)?;
     for list_node in doc.descendants().filter(|n| n.has_tag_name("list")) {
         let path = get_attr(&list_node, "path");
@@ -459,11 +484,124 @@ pub fn load_prefixes() -> Result<Prefixes> {
 }
 
 pub fn save_prefixes(prefixes: &Prefixes) -> Result<()> {
-    // let writer = OpenOptions::new()
-    //     .write(true)
-    //     .truncate(true)
-    //     .create(true)
-    //     .open(prefixes_file()?)?;
     let writer = File::create(prefixes_file()?)?;
     Ok(serde_json::to_writer_pretty(writer, prefixes)?)
+}
+
+//  Verify that the current working directory is within
+//  a subversion working copy.
+//  Returns the info for the current directory or
+//  and Error if not withing a working copy.
+pub fn working_copy_info() -> Result<SvnInfo> {
+    if let Ok(wc_info) = info(".", None) {
+        Ok(wc_info)
+    }
+    else {
+        Err(General("This command must be run in a serversion working copy directory.".to_string()).into())
+    }
+}
+
+pub fn in_working_copy() -> bool {
+    working_copy_info().is_ok()
+}
+
+fn parse_svn_status(text: &str) -> Result<SvnStatus> {
+    let mut entries: Vec<StatusEntry> = vec![];
+    let doc = Document::parse(text)?;
+    if let Some(target) = doc.descendants().find(|n| n.has_tag_name("target")) {
+        for entry_node in target.children().into_iter() {
+            if let Some(wc_node) = get_child(&entry_node, "wc-status") {
+                let revision = get_attr(&wc_node, "revision");
+                entries.push(StatusEntry {
+                    path:         get_attr(&entry_node, "path"),
+                    item_status:  get_attr(&wc_node,    "item"),
+                    props_status: get_attr(&wc_node,    "props"),
+                    revision,
+                });
+            }
+        }
+        let path = get_attr(&target, "path");
+        Ok(SvnStatus{ path, entries })
+    }
+    else {
+        Err(General("Malformed svn status".to_string()).into())
+    }
+}
+
+pub fn status<S>(path: S, cwd: Option<&Path>) -> Result<SvnStatus>
+    where S: AsRef<str> + Display
+{
+    let mut args = Vec::new();
+    args.extend(vec!["status".to_string(), "--xml".to_string()]);
+    args.push(path.to_string());
+
+    let output = run_svn(&args, cwd)?;
+    if output.status.success() {
+        let text = String::from_utf8_lossy(&output.stdout);
+        Ok(parse_svn_status(&text)?)
+    }
+    else {
+        Err(SvnError(output).into())
+    }
+
+}
+
+pub fn add<S>(paths: &Vec<String>, depth: S, auto_props: bool, cwd: Option<&Path>) -> Result<()>
+    where S: AsRef<str> + Display
+{
+    let depth_arg = format!("--depth={}", depth);
+    let props_arg = (if auto_props { "--auto-props" } else {"--no-auto-props"}).to_string();
+    let mut args = Vec::new();
+    args.push("add".to_string());
+    args.push(depth_arg);
+    args.push(props_arg);
+    for path in paths {
+        args.push(path.to_owned());
+    }
+    let output = run_svn(&args, cwd)?;
+    if output.status.success() {
+        Ok(())
+    }
+    else {
+        Err(SvnError(output).into())        
+    }
+}
+
+pub fn create_patch(patch_file: &Path, cwd: &Path) -> Result<()> {
+    let mut args = Vec::new();
+    args.push("diff".to_string());
+    args.push("--depth=infinity".to_string());
+    args.push("--ignore-properties".to_string());
+    args.push(".".to_string());
+    let output = run_svn(&args, Some(cwd))?;
+    if output.status.success() {
+        let mut writer = File::create(patch_file)?;
+        writer.write_all(&output.stdout)?;
+        Ok(())
+    }
+    else {
+        Err(SvnError(output).into())        
+    }
+}
+
+pub fn revert<S>(paths: &Vec<String>, depth: S, remove_added: bool, cwd: Option<&Path>) -> Result<()>
+    where S: AsRef<str> + Display,
+{
+    let depth_arg = format!("--depth={}", depth);
+    let mut args = Vec::new();
+    args.push("revert".to_string());
+    args.push(depth_arg);
+    if remove_added {
+        args.push("--remove-added".to_string());
+    }
+    for path in paths {
+        args.push(path.to_owned());
+    }
+    let output = run_svn(&args, cwd)?;
+    if output.status.success() {
+        Ok(())
+    }
+    else {
+        Err(SvnError(output).into())        
+    }
 }

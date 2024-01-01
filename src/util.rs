@@ -2,7 +2,7 @@
 use thiserror::Error;
 use crate::svn::{self, LogPath, FromPath, LogEntry};
 use colored::*;
-use chrono::{DateTime, Local, NaiveDateTime};
+use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use std::sync::OnceLock;
 use std::path::PathBuf;
 use std::env::current_dir;
@@ -91,6 +91,12 @@ pub fn parse_svn_date(date_str: &str) -> DateTime<Local> {
     .with_timezone(&Local)
 }
 
+pub fn svn_date_to_rfc3339_string(date: &DateTime<Local>) -> String {
+    let utc_date = date.with_timezone(&Utc);
+
+    utc_date.to_rfc3339_opts(chrono::SecondsFormat::Micros, true)
+}
+
 pub fn parse_svn_date_opt(opt_date_str: Option<String>) -> DateTime<Local> {
     if let Some(date_str) = opt_date_str {
         parse_svn_date(date_str.as_str())
@@ -113,6 +119,29 @@ pub fn display_svn_datetime(date: &DateTime<Local>) -> String {
     } else {
         format!("{} {}", display_svn_date(date), display_svn_time(date))
     }
+}
+
+pub mod datetime_serializer {
+    use chrono::{DateTime, Local};
+    use serde::{self, Deserialize, Serializer, Deserializer};
+    // use anyhow::Result;
+
+    use super::{svn_date_to_rfc3339_string, parse_svn_date};
+
+    pub fn serialize<S>(date: &DateTime<Local>, serializer: S) -> core::result::Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let s = svn_date_to_rfc3339_string(date);
+        serializer.serialize_str(&s)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> core::result::Result<DateTime<Local>, D::Error>
+        where D: Deserializer<'de>
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(parse_svn_date(&s))
+    }
+
 }
 
 //  Print formatted commit info to stdout.

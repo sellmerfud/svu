@@ -4,7 +4,7 @@ use regex::Regex;
 use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
 use colored::*;
-use super::{SvCommand};
+use super::SvCommand;
 use crate::util::{SvError::*, join_paths, display_svn_datetime};
 use crate::svn::{self, Prefixes, SvnInfo};
 use chrono::Local;
@@ -114,7 +114,7 @@ fn get_branches(root_url: &String, all: bool, regexes: &Vec<Regex>, prefixes: &P
         branch_prefixes.sort();
         let acceptable = |branch: &String| -> bool {
             !all_prefixes.contains(branch) &&
-            (all || regexes.into_iter().find(|re| re.is_match(&branch)).is_some())
+            (all || regexes.into_iter().any(|re| re.is_match(&branch)))
         };
 
         for prefix in &branch_prefixes {
@@ -139,7 +139,7 @@ fn get_tags(root_url: &String, all: bool, regexes: &Vec<Regex>, prefixes: &Prefi
         tag_prefixes.sort();
         let acceptable = |tag: &String| -> bool {
             !all_prefixes.contains(tag) &&
-            (all || regexes.into_iter().find(|re| re.is_match(&tag)).is_some())
+            (all || regexes.into_iter().any(|re| re.is_match(&tag)))
         };
 
         for prefix in &tag_prefixes {

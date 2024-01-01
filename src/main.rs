@@ -15,7 +15,7 @@ fn run() -> Result<()> {
         if let Some(command) = app.commands.iter().find(|cmd| cmd.name() == name) {
             command.run(matches)
         } else {
-            Err(SvError::General(format!("Fatal: sub command {} not found!", name)).into())
+            Err(SvError::General(format!("Fatal: sub command '{}' not found!", name)).into())
         }
     } else {
         //  If user does not supply a command name

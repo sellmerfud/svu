@@ -21,10 +21,11 @@ impl <'a> App<'a> {
     {
         let mut cmd = Command::new("svr")
             .version(VERSION)
+            .about("Subversion utilities")
             .after_help("For help about a particular command type 'svr help <command>'");
 
         //  Add clap subcommmands
-        for sub in subs.iter() {
+        for sub in subs {
             cmd = cmd.subcommand(sub.clap_command());
         }
         cmd
