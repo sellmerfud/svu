@@ -219,7 +219,6 @@ fn show_path_result(root_url: &String, path_entry: &SvnInfo, prefixes: &Vec<Stri
     fn process_prefixes(root_url: String, rel_path: String, prefixes: Vec<String>) -> io::Result<Vec<Entry>> {
         let mut results = Vec::<Entry>::new();
         for prefix in prefixes {
-            // let path = join_paths(join_paths(root_url, prefix), rel_path);
             let path = join_paths(join_paths(root_url.as_str(), prefix.as_str()), rel_path.as_str());
             let info = svn::info(path.as_str(), Some("HEAD")).ok().map(|i| Box::new(i));
             results.push(Entry(prefix, info));

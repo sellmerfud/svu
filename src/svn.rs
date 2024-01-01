@@ -233,8 +233,17 @@ pub fn current_branch(path: &Path) -> Result<(String, String)> {
 fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
     let mut entries: Vec<SvnInfo> = vec![];
     let doc = Document::parse(text)?;
-    for entry in doc.descendants().filter(|n| n.has_tag_name("entry")) {
-        let commit  = get_child(&entry, "commit").unwrap();
+    for entry in doc.descendants().filter(|n| n.has_tag_name("entry")) {        
+        let (commit_rev, commit_author, commit_date) = if let Some(commit) = get_child(&entry, "commit") {
+            (
+                get_attr(&commit, "revision"),
+                get_child_text_or(&commit, "author", "n/a"),
+                parse_svn_date_opt(get_child_text(&commit, "date"))
+            )
+        }
+        else {
+            ("n/a".to_string(), "n/a".to_string(), *null_date())
+        };
         let repo    = get_child(&entry, "repository").unwrap();
         let wc_info = get_child(&entry, "wc-info");
 
@@ -247,9 +256,9 @@ fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
             rel_url:       get_child_text_or(&entry, "relative-url", "n/a"),
             root_url:      get_child_text_or(&repo, "root", "n/a"),
             repo_uuid:     get_child_text_or(&repo, "uuid", "n/a"),
-            commit_rev:    get_attr(&commit, "revision"),
-            commit_author: get_child_text_or(&commit, "author", "n/a"),
-            commit_date:   parse_svn_date_opt(get_child_text(&commit, "date")),
+            commit_rev,
+            commit_author,
+            commit_date,
 
             wc_path: wc_info.map(|x| get_child_text_or(&x, "wcroot-abspath", "n/a")),
         };

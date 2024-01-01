@@ -11,7 +11,6 @@ pub struct Prefix;
 
 #[derive(Debug)]
 struct Options {
-    // #[arg(value_parser = parse_prefix)]
     add_branch: Vec<String>,
     rem_branch: Vec<String>,
     add_tag:    Vec<String>,
@@ -167,7 +166,7 @@ fn prefix_operations(options: &Options) -> Result<()> {
             .into_iter()
             .filter(|e| !options.rem_tag.contains(&e))
             .collect();
-        
+
         if prefixes.tag_prefixes.is_empty() {
             prefixes.tag_prefixes.push("tags".to_string());
         }

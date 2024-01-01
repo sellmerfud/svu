@@ -93,7 +93,6 @@ pub fn parse_svn_date(date_str: &str) -> DateTime<Local> {
 
 pub fn svn_date_to_rfc3339_string(date: &DateTime<Local>) -> String {
     let utc_date = date.with_timezone(&Utc);
-
     utc_date.to_rfc3339_opts(chrono::SecondsFormat::Micros, true)
 }
 

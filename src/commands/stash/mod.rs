@@ -109,7 +109,7 @@ const MODIFIED:    &'static str = "modified";
 // path for directories wil end with a slash/  (only happens for removed directories)
 // revision of the file when it was modified (for display only)
 // status will be one of: deleted, modified, added, unversioned
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
   struct StashItem {
     path:     String,
     revision: String,
@@ -119,18 +119,28 @@ const MODIFIED:    &'static str = "modified";
 }
 
 impl StashItem {
-    fn _path_display<'a>(&'a self) -> Cow<'a, str> {
+    fn path_display<'a>(&'a self) -> Cow<'a, str> {
         if self.is_dir {
             Cow::Owned(self.path.to_owned() + "/")
         } else {
             Cow::Borrowed(self.path.as_str())
         }
     }
+
+    fn status_display<'a>(&'a self) -> String {
+        match self.status.as_str() {
+            UNVERSIONED => "?".to_string(),
+            ADDED       => "A".green().to_string(),
+            DELETED     => "D".red().to_string(),
+            MODIFIED    => "M".magenta().to_string(),
+            _           => " ".to_string()
+        }
+    }
 }
 
 use crate::util::datetime_serializer;
 //  Stash entries saved to .sv/stash/stash_entries.json
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct StashFileEntry {
     branch:      String,
     revision:    String,
