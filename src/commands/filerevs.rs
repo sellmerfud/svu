@@ -1,5 +1,7 @@
 
 
+use core::num;
+
 use regex::Regex;
 use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
@@ -206,6 +208,25 @@ fn max_width(label: &str, value_widths: impl Iterator<Item = usize>) -> usize {
     value_widths.fold(label.len(), |m, v| m.max(v))
 }
 
+fn get_chunks(prefixes: &Vec<String>, num_cpus: usize) -> Vec<Vec<String>> {
+    let per_chunck  = prefixes.len() / num_cpus;
+    let extra       = prefixes.len() % num_cpus;
+    let mut chunks  = Vec::new();
+    let mut current = Vec::<String>::new();
+    let mut it      = prefixes.iter();
+
+    while let Some(prefix) = it.next() {
+        let plus_one = if chunks.len() + 1 <= extra { 1 } else { 0 };
+        let limit = per_chunck + plus_one;
+        if current.len() == limit {
+            chunks.push(current);
+            current = Vec::new();
+        }
+        current.push(prefix.to_string());
+    }
+    chunks.push(current);
+    chunks
+}
 // /this/is/the/users/path              
 // Location        Revision  Author  Date         Size
 // --------------  --------  ------  -----------  ----------
@@ -231,15 +252,8 @@ fn show_path_result(root_url: &str, path_entry: &SvnInfo, prefixes: &Vec<String>
 
     let num_cpus = num_cpus::get();
     if num_cpus > 1 {
-        //  Process prefix results in parallel
-        let _num = (prefixes.len() - 1) / 8 + 1;
-        let num = if prefixes.len() >= num_cpus {
-            let extra = if prefixes.len() % num_cpus == 0 { 0 } else { 1 };
-            prefixes.len() / num_cpus + extra
-         } else { 1 };
-        let prefix_chunks = prefixes.chunks(num).map(|v| v.to_owned());
+        let prefix_chunks = get_chunks(prefixes, num_cpus);
         let mut threads = vec![];
-        
         for prefix_list in prefix_chunks {
             let r = root_url.to_string();
             let p = rel_path.clone();
