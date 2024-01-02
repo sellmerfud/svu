@@ -5,6 +5,7 @@ use colored::Colorize;
 use crate::util::SvError::*;
 use super::SvCommand;
 use std::borrow::Cow;
+use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use crate::svn;
@@ -12,6 +13,8 @@ use crate::util;
 use std::fs::create_dir;
 use serde::{Deserialize, Serialize};
 use regex::Regex;
+use pathdiff::diff_paths;
+use std::env::current_dir;
 
 pub trait StashCommand {
     fn name(&self) -> &'static str;
@@ -282,4 +285,70 @@ fn get_stash_items(wc_root: &Path, unversioned: bool) -> Result<Vec<StashItem>> 
         items if unversioned => Ok(fixup_unversioned_items(&items, &wc_root)?.into_owned()),
         items => Ok(items)
     }
+}
+
+fn apply_stash(stash: &StashFileEntry, wc_root: &Path, dry_run: bool) -> Result<()> {
+    let path_re    = Regex::new(r"^([ADUCG>])(\s+)(.+)$")?;
+    let patch_file = stash_path()?.join(&stash.patch_name);
+    let cwd        = current_dir()?;
+    let stdout     = svn::apply_patch(&patch_file, dry_run, Some(&wc_root))?;
+    let mut last_status = "".to_string();
+
+    for line in stdout.lines() {
+        let line = line?;
+        if let Some(captures) = path_re.captures(line.as_str()) {
+            // let x = &captures[1];
+            let status = &captures[1];
+            let space  = &captures[2];
+            let path   = &captures[3];
+            let rel_path = match status {
+                ">" => path.to_string(), // Not a path
+                _   => {
+                    diff_paths(&wc_root.join(path), &cwd).unwrap().to_string_lossy().to_string()
+                }
+            };
+            let color = match status {
+                "C" => "red",
+                "G" => "magenta",
+                ">" if last_status == "C" => "red",
+                ">" if last_status == "G" => "magenta",
+                _ => "white",
+            };
+            let new_line = format!("{}{}{}", status, space, rel_path);
+            println!("{}", new_line.color(color));
+            last_status = status.to_string();
+        }
+        else {
+            println!("{}", line);
+        }
+    }
+
+    if !dry_run {
+      // The working copy has been restored via the patch, but and files that were
+      // `unversioned`` when the stash was created will not appear as `added``.
+      // We must run `svn revert` on each unversioned item so that it will
+      // once again become unversioned.
+        let unversioned: Vec<StashItem> = stash.items.
+            iter()
+            .filter_map(|i| if i.status == UNVERSIONED { Some(i.clone()) } else { None })
+            .collect();
+
+        if !unversioned.is_empty() {
+            let unversioned_dirs: Vec<String> = unversioned
+                .iter()
+                .filter_map(|i| if i.is_dir { Some(i.path.clone()) } else { None} )
+                .collect();
+            let can_skip = |i: &StashItem| -> bool {
+                unversioned_dirs.iter().any(|d| i.path.starts_with(d)  && i.path != *d)
+            };
+            let revert_paths: Vec<String> = unversioned
+                .iter()
+                .filter_map(|i| if can_skip(i) { None } else { Some(i.path.clone()) })
+                .collect();
+            svn::revert(&revert_paths, "infinity", false, Some(&wc_root))?;
+        }
+
+        println!("Updated working copy state: {}", stash.summary_display());
+    }
+    Ok(())
 }

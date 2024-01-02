@@ -211,7 +211,12 @@ pub fn workingcopy_root(working_dir: &Path) -> Option<PathBuf> {
         }
     }
 
-    find_it(working_dir).map(|p| p.to_path_buf())
+    if let Some(wd) = working_dir.canonicalize().ok() {
+        find_it(&wd).map(PathBuf::from)
+    }
+    else {
+        None
+    }
 }
 
 //  Returns the branch name and current commit revision
@@ -576,6 +581,28 @@ pub fn add<S>(paths: &Vec<String>, depth: S, auto_props: bool, cwd: Option<&Path
     }
 }
 
+pub fn revert<S>(paths: &Vec<String>, depth: S, remove_added: bool, cwd: Option<&Path>) -> Result<()>
+    where S: AsRef<str> + Display,
+{
+    let depth_arg = format!("--depth={}", depth);
+    let mut args = Vec::new();
+    args.push("revert".to_string());
+    args.push(depth_arg);
+    if remove_added {
+        args.push("--remove-added".to_string());
+    }
+    for path in paths {
+        args.push(path.to_owned());
+    }
+    let output = run_svn(&args, cwd)?;
+    if output.status.success() {
+        Ok(())
+    }
+    else {
+        Err(SvnError(output).into())        
+    }
+}
+
 pub fn create_patch(patch_file: &Path, cwd: &Path) -> Result<()> {
     let mut args = Vec::new();
     args.push("diff".to_string());
@@ -593,22 +620,18 @@ pub fn create_patch(patch_file: &Path, cwd: &Path) -> Result<()> {
     }
 }
 
-pub fn revert<S>(paths: &Vec<String>, depth: S, remove_added: bool, cwd: Option<&Path>) -> Result<()>
-    where S: AsRef<str> + Display,
-{
-    let depth_arg = format!("--depth={}", depth);
+
+pub fn apply_patch(patch_file: &Path, dry_run: bool, cwd: Option<&Path>) -> Result<Vec<u8>> {
     let mut args = Vec::new();
-    args.push("revert".to_string());
-    args.push(depth_arg);
-    if remove_added {
-        args.push("--remove-added".to_string());
+    args.push("patch".to_string());
+    if dry_run {
+        args.push("--dry-run".to_string());
     }
-    for path in paths {
-        args.push(path.to_owned());
-    }
+    args.push(patch_file.to_string_lossy().to_string());
+
     let output = run_svn(&args, cwd)?;
     if output.status.success() {
-        Ok(())
+        Ok(output.stdout)
     }
     else {
         Err(SvnError(output).into())        
