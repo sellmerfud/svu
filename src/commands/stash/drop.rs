@@ -43,9 +43,7 @@ fn build_options(matches: &ArgMatches) -> Options {
 fn do_drop(options: &Options) -> Result<()> {
     svn::working_copy_info()?;  // Make sure we are in a working copy.
     let mut stash_entries = load_stash_entries()?;
-
     if options.stash_id < stash_entries.len() {
-        
         let stash = stash_entries.remove(options.stash_id);
         let patch_file = stash_path()?.join(stash.patch_name.as_str());
         save_stash_entries(&stash_entries)?;
@@ -54,7 +52,7 @@ fn do_drop(options: &Options) -> Result<()> {
         Ok(())
     }
     else {
-        let msg = format!("stash-{} does not exist in the stash", options.stash_id);
+        let msg = format!("{} does not exist in the stash", stash_id_display(options.stash_id));
         Err(General(msg).into())
     }
 

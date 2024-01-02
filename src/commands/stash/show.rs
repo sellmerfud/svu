@@ -63,9 +63,9 @@ fn do_show(options: &Options) -> Result<()> {
         let patch_file = stash_path()?.join(stash.patch_name.as_str());
         let rel_patch  = diff_paths(&patch_file, &cwd).unwrap();
 
-        println!("stash     : {}", stash.summary_display());
-        println!("created   : {}", display_svn_datetime(&stash.date).magenta());
-        println!("patch file: {}", rel_patch.to_string_lossy().blue());
+        println!("{:<11}| {}", stash_id_display(options.stash_id), stash.summary_display());
+        println!("{:<11}| {}", "created", display_svn_datetime(&stash.date).magenta());
+        println!("{:<11}| {}", "patch file", rel_patch.to_string_lossy().blue());
         println!("{:->70}", "-");
         for item in &stash.items {
             let mut pathname = item.path.clone();
@@ -77,12 +77,13 @@ fn do_show(options: &Options) -> Result<()> {
             // First create the full path to the item relative to the working copy root.
             // Then make that relative to the current working directory.
             let rel_path  = diff_paths(&wc_root.join(path), &cwd).unwrap();
-            let revision  = if item.status == UNVERSIONED {
-                "unversioned"
-            } else {
-                item.revision.as_str()
+            let revision  = match item.status.as_str() {
+                UNVERSIONED => "unversioned",
+                ADDED       => "new",
+                _           => item.revision.as_str()
             };
-            println!("{} {} [{}]", item.status_display(), rel_path.to_string_lossy(), revision.yellow())
+            let color = item.status_color();
+            println!("{} {} [{}]", item.status_letter().color(color), rel_path.to_string_lossy().color(color), revision.yellow())
         }
 
         if options.show_diff {
@@ -96,7 +97,7 @@ fn do_show(options: &Options) -> Result<()> {
         Ok(())
     }
     else {
-        let msg = format!("stash-{} does not exist in the stash", options.stash_id);
+        let msg = format!("{} does not exist in the stash", stash_id_display(options.stash_id));
         Err(General(msg).into())
     }
 

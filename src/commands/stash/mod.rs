@@ -93,6 +93,10 @@ fn parse_stash_id(arg: &str) -> Result<usize> {
     }
 }
 
+fn stash_id_display(id: usize) -> String {
+    format!("stash-{}", id)
+}
+
 
 // Common structure and functions used by all of the stash commands.
 
@@ -131,13 +135,23 @@ const MODIFIED:    &'static str = "modified";
 }
 
 impl StashItem {
-    fn status_display<'a>(&'a self) -> String {
+    fn status_letter<'a>(&'a self) -> &'static str {
         match self.status.as_str() {
-            UNVERSIONED => "?".to_string(),
-            ADDED       => "A".green().to_string(),
-            DELETED     => "D".red().to_string(),
-            MODIFIED    => "M".magenta().to_string(),
-            _           => " ".to_string()
+            UNVERSIONED => "?",
+            ADDED       => "A",
+            DELETED     => "D",
+            MODIFIED    => "M",
+            _           => " ",
+        }
+    }
+
+    fn status_color<'a>(&'a self) -> &'static str {
+        match self.status.as_str() {
+            UNVERSIONED => "white",
+            ADDED       => "green",
+            DELETED     => "red",
+            MODIFIED    => "magenta",
+            _           => "white",
         }
     }
 }

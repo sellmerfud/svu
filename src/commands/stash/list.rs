@@ -1,6 +1,6 @@
 
 use clap::{Command, ArgMatches};
-use super::{StashCommand, load_stash_entries};
+use super::*;
 use anyhow::Result;
 use crate::svn;
 
@@ -18,7 +18,7 @@ impl StashCommand for List {
         svn::working_copy_info()?;  // Make sure we are in a working copy.
 
         for (index, stash) in load_stash_entries()?.iter().enumerate() {
-            println!("stash-{} - {}", index, stash.summary_display());
+            println!("{:<8} | {}", stash_id_display(index), stash.summary_display());
         }
         Ok(())
     }
