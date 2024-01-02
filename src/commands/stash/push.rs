@@ -102,7 +102,7 @@ fn do_command<'a>(options: &Options) -> Result<()> {
             patch_name,
             items: items.clone(),
         };
-        save_stash_entry(&stash)?;
+        add_stash_entry(&stash)?;
 
         if options.revert_working_copy {
             // Lastly we revert the working copy.

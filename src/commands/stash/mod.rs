@@ -11,6 +11,7 @@ use crate::svn;
 use crate::util;
 use std::fs::create_dir;
 use serde::{Deserialize, Serialize};
+use regex::Regex;
 
 pub trait StashCommand {
     fn name(&self) -> &'static str;
@@ -19,10 +20,10 @@ pub trait StashCommand {
 }
 
 pub mod push;
-pub mod list;
 pub mod pop;
 pub mod apply;
 pub mod drop;
+pub mod list;
 pub mod show;
 pub mod clear;
 
@@ -30,10 +31,10 @@ pub mod clear;
 pub fn stash_commands<'a>() -> Vec<&'a dyn StashCommand> {
     vec![
         &push::Push,
-        &list::List,
         &pop::Pop,
         &apply::Apply,
         &drop::Drop,
+        &list::List,
         &show::Show,
         &clear::Clear,
     ]
@@ -81,6 +82,17 @@ impl SvCommand for Stash {
     }
 }
 
+fn parse_stash_id(arg: &str) -> Result<usize> {
+    let re = Regex::new(r"^(?:stash-)?(\d+)$")?;
+    if let Some(captures) = re.captures(arg) {
+        let id = captures .get(1).unwrap() .as_str().parse::<usize>()?;
+        Ok(id)
+    }
+    else {
+        Err(General("Stash id must be 'stash-<n>' or '<n>'".to_string()).into())
+    }
+}
+
 
 // Common structure and functions used by all of the stash commands.
 
@@ -119,14 +131,6 @@ const MODIFIED:    &'static str = "modified";
 }
 
 impl StashItem {
-    fn path_display<'a>(&'a self) -> Cow<'a, str> {
-        if self.is_dir {
-            Cow::Owned(self.path.to_owned() + "/")
-        } else {
-            Cow::Borrowed(self.path.as_str())
-        }
-    }
-
     fn status_display<'a>(&'a self) -> String {
         match self.status.as_str() {
             UNVERSIONED => "?".to_string(),
@@ -159,14 +163,6 @@ impl StashFileEntry {
 
 }
 
-// pub fn deserialize<'de, D>(date: DateTime<Local>, deserializer: D) -> Result<D::Ok>
-//     where D: Deserializer<'de>
-// {
-//     let s = display_svn_datetime(&date);
-//     deserializer.
-//     deserializer.deserialize_str(&s)
-// }
-
 fn load_stash_entries() -> Result<Vec<StashFileEntry>> {
     let path = stash_entries_file()?;
     if path.is_file() {
@@ -180,13 +176,20 @@ fn load_stash_entries() -> Result<Vec<StashFileEntry>> {
 }
 
 
-fn save_stash_entry(stash: &StashFileEntry) -> Result<()> {
+fn add_stash_entry(stash: &StashFileEntry) -> Result<()> {
     let mut entries = load_stash_entries()?;
 
     entries.insert(0, stash.clone());
     let writer = File::create(stash_entries_file()?)?;
     Ok(serde_json::to_writer_pretty(writer, &entries)?)
 }
+
+fn save_stash_entries(entries: &Vec<StashFileEntry>) -> Result<()> {
+    let writer = File::create(stash_entries_file()?)?;
+    Ok(serde_json::to_writer_pretty(writer, entries)?)
+}
+
+
 //  Runs `svn status` on the working copy root directory
 //  If we are not including unversioned items then we filter them out and build the list
 //

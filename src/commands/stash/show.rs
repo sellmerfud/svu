@@ -1,7 +1,6 @@
 
 use clap::{Command, Arg, ArgMatches};
 use super::*;
-use regex::Regex;
 use anyhow::Result;
 use crate::util::{display_svn_datetime, print_diff_line};
 use crate::svn::{self, workingcopy_root};
@@ -13,18 +12,6 @@ pub struct Show;
 struct Options {
     show_diff:  bool,
     stash_id:   usize,
-}
-
-
-fn parse_stash_id(arg: &str) -> Result<usize> {
-    let re = Regex::new(r"^(?:stash-)?(\d+)$")?;
-    if let Some(captures) = re.captures(arg) {
-        let id = captures .get(1).unwrap() .as_str().parse::<usize>()?;
-        Ok(id)
-    }
-    else {
-        Err(General("Stash id must be 'stash-<n>' or '<n>'".to_string()).into())
-    }
 }
 
 impl StashCommand for Show {
@@ -81,9 +68,15 @@ fn do_show(options: &Options) -> Result<()> {
         println!("patch file: {}", rel_patch.to_string_lossy().blue());
         println!("{:->70}", "-");
         for item in &stash.items {
+            let mut pathname = item.path.clone();
+            //  append '/' for directories
+            if item.is_dir {
+                pathname.push('/');
+            }
+            let path = Path::new(pathname.as_str());
             // First create the full path to the item relative to the working copy root.
             // Then make that relative to the current working directory.
-            let rel_path  = diff_paths(&wc_root.join(&item.path), &cwd).unwrap();
+            let rel_path  = diff_paths(&wc_root.join(path), &cwd).unwrap();
             let revision  = if item.status == UNVERSIONED {
                 "unversioned"
             } else {
