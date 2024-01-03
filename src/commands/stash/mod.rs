@@ -57,7 +57,6 @@ impl SvCommand for Stash {
                           on something else and then merge the stashed changes back into\n\
                           your working copy at a later time.\n\n\
                           You can omit the COMMAND to quickly run the 'push' command.")
-            // .args(push::Push::push_args().iter().map(|a| a.clone().hide(true)));
             .args(push::Push::push_args());
 
         //  Add clap subcommmands
@@ -101,7 +100,7 @@ fn stash_id_display(id: usize) -> String {
 }
 
 
-// Common structure and functions used by all of the stash commands.
+// Common structures and functions used by all of the stash commands.
 
 fn stash_path() -> Result<PathBuf> {
     let path = util::data_directory()?.join("stash");

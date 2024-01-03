@@ -637,3 +637,19 @@ pub fn apply_patch(patch_file: &Path, dry_run: bool, cwd: Option<&Path>) -> Resu
         Err(SvnError(output).into())        
     }
 }
+
+pub fn update(revision: &str, depth: &str, cwd: Option<&Path>) -> Result<Vec<u8>> {
+    let mut args = Vec::new();
+    let depth_arg = format!("--depth={}", depth);
+    let rev_arg   = format!("--revision={}", revision);
+    args.push("update".to_string());
+    args.push(depth_arg);
+    args.push(rev_arg);
+    let output = run_svn(&args, cwd)?;
+    if output.status.success() {
+        Ok(output.stdout)
+    }
+    else {
+        Err(SvnError(output).into())        
+    }
+}

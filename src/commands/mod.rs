@@ -12,6 +12,7 @@ pub mod branch;
 pub mod show;
 pub mod filerevs;
 pub mod stash;
+pub mod bisect;
 pub mod prefix;
 pub mod ignore;
 
@@ -23,6 +24,7 @@ pub fn sub_commands<'a>() -> Vec<&'a dyn SvCommand> {
         &show::Show,
         &filerevs::FileRevs,
         &stash::Stash,
+        &bisect::Bisect,
         &prefix::Prefix,
         &ignore::Ignore
     ]
