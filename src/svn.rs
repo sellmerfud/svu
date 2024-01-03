@@ -216,11 +216,12 @@ pub fn resolve_revision(rev_string: &str, path: &str) -> Result<String> {
 //  In order to resovle the string using svn log we need a working copy path.
 pub fn resolve_revision_range(rev_string: &str, path: &str) -> Result<String> {
     let parts: Vec<&str> = rev_string.split(":").collect();
+    let re = Regex::new(r"[-+]")?;
     match parts.len() {
         1 => resolve_revision(&parts[0], path),
         2 => {
-            let a = resolve_revision(&parts[0], path)?;
-            let b = resolve_revision(&parts[1], path)?;
+            let a = if re.is_match(&parts[0]) {resolve_revision(&parts[0], path)? } else { parts[0].to_string()} ;
+            let b = if re.is_match(&parts[1]) {resolve_revision(&parts[1], path)? } else { parts[1].to_string()} ;
             Ok(format!("{}:{}", a, b))
         }
         _ => {
