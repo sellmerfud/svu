@@ -15,7 +15,7 @@ impl StashCommand for List {
     }
         
     fn run(&self, _matches: &ArgMatches) -> Result<()> {
-        svn::working_copy_info()?;  // Make sure we are in a working copy.
+        svn::workingcopy_info()?;  // Make sure we are in a working copy.
 
         for (index, stash) in load_stash_entries()?.iter().enumerate() {
             println!("{:<8} | {}", stash_id_display(index), stash.summary_display());

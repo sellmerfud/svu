@@ -2,6 +2,7 @@
 use regex::Regex;
 use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
+use crate::commands::bisect::replay;
 use crate::svn::{self, LogEntry};
 use crate::util::{self, StringWrapper};
 use colored::*;
@@ -10,7 +11,7 @@ use super::SvCommand;
 
 pub struct Log;
 struct Options {
-    limit:        Option<u16>,
+    limit:        Option<usize>,
     author:       bool,
     date:         bool,
     time:         bool,
@@ -54,7 +55,7 @@ impl Options {
             reverse:      matches.get_flag("reverse"),
             show_paths:   matches.get_flag("show-paths"),
             stop_on_copy: matches.get_flag("stop-on-copy"),
-            limit:        matches.get_one::<u16>("limit").copied(),
+            limit:        matches.get_one::<usize>("limit").copied(),
             revisions,
             regexes,
             paths
@@ -181,24 +182,25 @@ fn get_log_entries(options: &Options) -> Result<Vec<LogEntry>> {
     //  then treat it as one, appending :0 if it does not have a range.
     if revisions.is_empty() && 
         !paths.is_empty() &&
-        svn::looks_like_revision(paths[0].as_str()) {
+        svn::looks_like_revision_range(paths[0].as_str()) {
         revisions = vec![paths.remove(0)];
     };
 
     //  Resolve any revisions that contains names such as HEAD or
     // that contain rev-3 type expressions.
     let resolve_path = paths.first().map(|p| p.as_str()).unwrap_or(".");
-    revisions = revisions.into_iter().flat_map(|r| {
-        svn::resolve_revision_string(r.as_str(), resolve_path)
-    }).collect();
+    let mut resolved_revs = Vec::new();
+    for rev in &revisions {
+        resolved_revs.push(svn::resolve_revision_range(rev.as_str(), resolve_path)?);
+    }
 
-    if revisions.len() == 1 && !revisions[0].contains(':') {
-        revisions[0] = format!("{}:0", revisions[0]);
+    if resolved_revs.len() == 1 && !resolved_revs[0].contains(':') {
+        resolved_revs[0] = format!("{}:0", resolved_revs[0]);
     }
 
     let entries = svn::log(
         &paths,
-        &revisions,
+        &resolved_revs,
         true,  // include_msg
         options.limit,
         options.stop_on_copy,

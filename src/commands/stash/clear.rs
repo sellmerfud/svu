@@ -18,7 +18,7 @@ impl StashCommand for Clear {
         
     fn run(&self, _matches: &ArgMatches) -> Result<()> {
 
-        svn::working_copy_info()?;  // Make sure we are in a working copy.
+        svn::workingcopy_info()?;  // Make sure we are in a working copy.
         let stash_entries_path = stash_entries_file()?;
         let stash_entries      = load_stash_entries()?; 
 

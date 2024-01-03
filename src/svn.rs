@@ -150,40 +150,82 @@ fn get_child_text_or(parent: &Node, name: &str, default: &str) -> String {
 fn rev_re() -> &'static Regex {
     static REV: OnceLock<Regex> = OnceLock::new();
     REV.get_or_init(|| {
-        Regex::new(r"^(\d+|HEAD|BASE|PREV|COMMITTED)(?::(\d+|HEAD|BASE|PREV|COMMITTED)|([+-])(\d+))?$")
+        Regex::new(r"^(\d+|HEAD|BASE|PREV|COMMITTED)([+-]\d+)?$")
                 .expect("Error parsing REV regular expression")
     })
 }
 
-
 pub fn looks_like_revision(text: &str) -> bool {
     rev_re().is_match(text)
+}
+
+fn rev_range_re() -> &'static Regex {
+    static REV: OnceLock<Regex> = OnceLock::new();
+    REV.get_or_init(|| {
+        Regex::new(r"^(?:(?:\d+|HEAD|BASE|PREV|COMMITTED)(?:[+-]\d+)?)(?::(?:\d+|HEAD|BASE|PREV|COMMITTED)(?:[+-]\d+)?)?$")
+                .expect("Error parsing REV regular expression")
+    })
+}
+
+pub fn looks_like_revision_range(text: &str) -> bool {
+    rev_range_re().is_match(text)
+}
+
+//  Use svn log to verify that the revision string refers to a
+//  valid revision.
+fn get_revision_number(rev: &str, delta: i32, path: &str) -> Result<String> {
+    let rev_str = match delta {
+        0          =>  rev.to_string(),
+        d if d < 0 => format!("{}:0", rev),
+        _          => format!("{}:HEAD", rev),
+    };
+    let limit = Some(delta.abs() as usize + 1);
+    let entries = log(&vec![path], &vec![&rev_str], false, limit, false, false)?;
+    match entries.last() {
+        Some(log) => Ok(log.revision.to_owned()),
+        None      => {
+            let msg = format!("Revision cannot be resolved rev={}, delta={}, path={}", rev, delta, path);
+            Err(General(msg).into())
+        }
+    }
+}
+
+pub fn resolve_revision(rev_string: &str, path: &str) -> Result<String> {
+    fn err(r: &str, d: &str, p: &str) -> Result<String> {
+        let msg = format!("Cannot resolve revision '{}{}' for path '{}'", r, d, p);
+        Err(General(msg).into())
+    }
+    match rev_re().captures(rev_string) {
+        None => err(rev_string, "", path),
+        Some(caps) => {
+            match (caps.get(1), caps.get(2)) {
+                (Some(rev), None) => get_revision_number(rev.as_str(), 0, path).or(err(rev.as_str(), "", path)),
+                (Some(rev), Some(delta)) => {
+                    let d = delta.as_str().parse::<i32>()?;
+                    get_revision_number(rev.as_str(), d, path).or(err(rev.as_str(), delta.as_str(), path))
+               }
+               _ => unreachable!("resolve_revision_string, fell through match!")
+            }
+        }
+    }
 }
 
 //  Resolve a revision string entered by the user.
 //  If the string contains a revision keyword or if it contains a delta expression
 //  then we must use svn log to get the actual revsion.
 //  In order to resovle the string using svn log we need a working copy path.
-pub fn resolve_revision_string(rev_string: &str, path: &str) -> Result<String> {
-    match rev_re().captures(rev_string) {
-        None => {
+pub fn resolve_revision_range(rev_string: &str, path: &str) -> Result<String> {
+    let parts: Vec<&str> = rev_string.split(":").collect();
+    match parts.len() {
+        1 => resolve_revision(&parts[0], path),
+        2 => {
+            let a = resolve_revision(&parts[0], path)?;
+            let b = resolve_revision(&parts[1], path)?;
+            Ok(format!("{}:{}", a, b))
+        }
+        _ => {
             let msg = format!("Cannot resolve revision from {} for path {}", rev_string, path);
             Err(General(msg).into())
-        }
-        Some(caps) => {
-            let result = match (caps.get(1), caps.get(2), caps.get(3), caps.get(4)) {
-                (Some(_), None, None, None)              => rev_string.to_owned(),
-                (Some(_), Some(_), None, None)           => rev_string.to_owned(),
-                (Some(rev), None, Some(op), Some(delta)) => {
-                    let test_rev = if op.as_str() == "-"  { format!("{}:0", rev.as_str())} else { format!("{}:HEAD", rev.as_str()) };
-                    let revs = vec![test_rev.as_str()];
-                    let limit = delta.as_str().parse::<u16>().ok().map(|v| v + 1);
-                    let entries = log(&vec![path], &revs, false, limit, false, false)?;
-                    entries.last().unwrap().revision.to_owned()
-               }
-               _ => unreachable!("resolve_revision_string, fell through match!")
-            };
-            Ok(result)
         }
     }
 }
@@ -363,7 +405,7 @@ pub fn log<S>(
     paths: &Vec<S>,
     revisions: &Vec<S>,
     include_msg: bool,
-    limit: Option<u16>,
+    limit: Option<usize>,
     stop_on_copy: bool,
     include_paths: bool) -> Result<Vec<LogEntry>>
         where S: AsRef<str> + Display
@@ -506,7 +548,7 @@ pub fn save_prefixes(prefixes: &Prefixes) -> Result<()> {
 //  a subversion working copy.
 //  Returns the info for the current directory or
 //  and Error if not withing a working copy.
-pub fn working_copy_info() -> Result<SvnInfo> {
+pub fn workingcopy_info() -> Result<SvnInfo> {
     if let Ok(wc_info) = info(".", None) {
         Ok(wc_info)
     }
@@ -515,8 +557,8 @@ pub fn working_copy_info() -> Result<SvnInfo> {
     }
 }
 
-pub fn in_working_copy() -> bool {
-    working_copy_info().is_ok()
+pub fn in_workingcopy() -> bool {
+    workingcopy_info().is_ok()
 }
 
 fn parse_svn_status(text: &str) -> Result<SvnStatus> {

@@ -5,7 +5,7 @@ use colored::Colorize;
 use crate::util::{SvError::*, show_commit};
 use super::SvCommand;
 use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::fs::File;
 use crate::svn::{self, LogEntry};
 use crate::util;
@@ -103,7 +103,7 @@ fn parse_term(arg: &str) -> Result<String> {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct BisectData {
     #[serde(rename(serialize = "localPath", deserialize = "localPath"))]
-    local_path:   String,
+    local_path:   String,   // No longer used!
     #[serde(rename(serialize = "originalRev", deserialize = "originalRev"))]
     original_rev: String,
     #[serde(rename(serialize = "headRev", deserialize = "headRev"))]
@@ -150,14 +150,7 @@ fn load_bisect_data() -> Result<Option<BisectData>> {
     if path.is_file() {
         let reader = File::open(path)?;
         let data: BisectData = serde_json::from_reader(reader)?;
-        if Path::new(data.local_path.as_str()) != current_dir()? {
-            let msg = format!("This command must be run from the directory where the bisect session was started\n\
-                              {}", data.local_path);
-            Err(General(msg).into())
-        }
-        else {
-            Ok(Some(data))
-        }
+        Ok(Some(data))
     } else {
         Ok(None)
     }
@@ -223,6 +216,13 @@ fn display_bisect_command(cmd_line: &Vec<String>) -> () {
     println!("{}", cmd_line.join(" "));
 }
 
+//  Convert a revision to a numerica value.
+//  !! This assumes that the revision has been
+//  resolved and contains only digits !!
+fn to_rev_num(rev: &str) -> usize {
+    rev.parse().ok().unwrap()
+}
+
 fn get_workingcopy_bounds() -> Result<(String, String)> {
     let first = svn::log(&vec![], &vec!["HEAD:0"], true, Some(1), false,false)?
         .first().unwrap().revision.clone();
@@ -234,7 +234,7 @@ fn get_workingcopy_bounds() -> Result<(String, String)> {
 fn get_extant_revisions(rev1: &str, rev2: &str) -> Result<Vec<String>> {
     let mut revisions = Vec::new();
     let range = format!("{}:{}", rev1, rev2);
-    println!("Fetching history from {} to {}", rev1.yellow(), rev2.yellow());
+    println!("Fetching history from revisions {} to {}", rev1.yellow(), rev2.yellow());
     let logs = svn::log(&vec![], &vec![range], false, None, false, false)?;
     for log in &logs {
         revisions.push(log.revision.clone());
@@ -307,7 +307,42 @@ fn perform_bisect(data: &BisectData) -> Result<bool> {
 
 fn update_workingcopy(revision: &String) -> Result<()> {
     let msg = get_1st_log_message(revision)?;
+    let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
     println!("Updating working copy: [{}] {}", revision.yellow(), msg);
-    svn::update(revision, "infinity", None)?;
+    svn::update(revision, "infinity", Some(&wc_root))?;
     Ok(())
+}
+
+//  Returns true if perform_bisect() reports that that session
+//  is complete.
+//  If this revision was previously skipped, it is no longer skipped.
+//  to start performing bisects
+fn mark_good_revision(revision: &str) -> Result<bool> {
+    let mut data = get_bisect_data()?;
+    data.skipped.remove(revision);
+    data.min_rev = Some(revision.to_string());
+    save_bisect_data(&data)?;
+    log_bisect_revision(revision, &data.good_name())?;
+    if data.is_ready() {
+        perform_bisect(&data)
+    } else {
+        Ok(false)
+    }
+}
+
+//  Returns true if perform_bisect() reports that that session
+//  is complete.
+//  If this revision was previously skipped, it is no longer skipped.
+//  to start performing bisects
+fn mark_bad_revision(revision: &str) -> Result<bool> {
+    let mut data = get_bisect_data()?;
+    data.skipped.remove(revision);
+    data.max_rev = Some(revision.to_string());
+    save_bisect_data(&data)?;
+    log_bisect_revision(revision, &data.bad_name())?;
+    if data.is_ready() {
+        perform_bisect(&data)
+    } else {
+        Ok(false)
+    }
 }

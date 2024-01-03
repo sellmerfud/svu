@@ -49,7 +49,7 @@ fn build_options(matches: &ArgMatches) -> Options {
 }
 
 fn do_work(_options: &Options) -> Result<()> {
-    svn::working_copy_info()?;  // Make sure we are in a working copy.
+    svn::workingcopy_info()?;  // Make sure we are in a working copy.
     if true {
         Ok(())
     }

@@ -21,7 +21,7 @@ impl BisectCommand for Log {
 
 
 fn do_work() -> Result<()> {
-    svn::working_copy_info()?;  // Make sure we are in a working copy.
+    svn::workingcopy_info()?;  // Make sure we are in a working copy.
     if true {
         Ok(())
     }

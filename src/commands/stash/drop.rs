@@ -41,7 +41,7 @@ fn build_options(matches: &ArgMatches) -> Options {
 }
 
 fn do_drop(options: &Options) -> Result<()> {
-    svn::working_copy_info()?;  // Make sure we are in a working copy.
+    svn::workingcopy_info()?;  // Make sure we are in a working copy.
     let mut stash_entries = load_stash_entries()?;
     if options.stash_id < stash_entries.len() {
         let stash = stash_entries.remove(options.stash_id);

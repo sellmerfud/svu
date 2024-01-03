@@ -48,7 +48,7 @@ fn build_options(matches: &ArgMatches) -> Options {
 }
 
 fn do_apply(options: &Options) -> Result<()> {
-    svn::working_copy_info()?;  // Make sure we are in a working copy.
+    svn::workingcopy_info()?;  // Make sure we are in a working copy.
     let stash_entries = load_stash_entries()?;
 
     if options.stash_id < stash_entries.len() {

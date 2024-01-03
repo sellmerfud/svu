@@ -1,5 +1,5 @@
 
-use std::{usize, fs::remove_file};
+use std::fs::remove_file;
 
 use clap::{Command, Arg, ArgMatches};
 use crate::util::display_svn_datetime;
@@ -73,7 +73,8 @@ fn build_options(matches: &ArgMatches) -> Options {
 
 fn do_work(options: &Options) -> Result<()> {
     let cmd_name: String = std::env::args().take(1).collect();
-    let wc_info = svn::working_copy_info()?;  // Make sure we are in a working copy.
+    let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
+    
     match load_bisect_data()? {
         Some(data) => {
             let mut stat = "".to_string();
@@ -85,20 +86,17 @@ fn do_work(options: &Options) -> Result<()> {
             Err(General(msg).into())
         },
         None => {
-            // if let Some(rev)
-            let good = options.good_rev
-                .as_ref()
-                .map(|rev| svn::resolve_revision_string(&rev, "."))
-                .map_or(Ok(None), |v| v.map(Some))?;
-            let bad = options.bad_rev
-                .as_ref()
-                .map(|rev| svn::resolve_revision_string(&rev, "."))
-                .map_or(Ok(None), |v| v.map(Some))?;
+            let good = options.good_rev.as_ref()
+                .map(|rev| svn::resolve_revision(&rev, "."))
+                .transpose()?;
+            let bad = options.bad_rev.as_ref()
+                .map(|rev| svn::resolve_revision(&rev, "."))
+                .transpose()?;
 
             match (&good, &bad) {
-                (Some(g), Some(b)) if g == b =>
+                (Some(g), Some(b)) if to_rev_num(g) == to_rev_num(b) =>
                     return Err(General("The 'good' and 'bad' revisions cannot be the same".to_string()).into()),
-                (Some(g), Some(b)) if g.parse::<usize>()? > b.parse::<usize>()? =>
+                (Some(g), Some(b)) if to_rev_num(g) > to_rev_num(b) =>
                     return Err(General("The 'good' revision must be an ancestor of the 'bad' revision".to_string()).into()),
                 _ => ()
             }

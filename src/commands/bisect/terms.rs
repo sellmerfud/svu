@@ -22,6 +22,7 @@ impl BisectCommand for Terms {
                     .help("Display the term for the 'good' subcommand")
                     .long("term-good")
                     .action(clap::ArgAction::SetTrue)
+                    .conflicts_with("term-bad")
             )
             .arg(
                 Arg::new("term-bad")
@@ -38,19 +39,28 @@ impl BisectCommand for Terms {
 }
 
 fn build_options(matches: &ArgMatches) -> Options {
-    let neither = !(matches.get_flag("term-good") || matches.get_flag("term-bad"));
     Options {
-        show_good: matches.get_flag("term-good") || neither,
-        show_bad: matches.get_flag("term-bad")   || neither,
+        show_good: matches.get_one::<bool>("term-good").copied().unwrap_or(false),
+        show_bad: matches.get_one::<bool>("term-bad").copied().unwrap_or(false),
     }
 }
 
-fn do_work(_options: &Options) -> Result<()> {
-    svn::working_copy_info()?;  // Make sure we are in a working copy.
-    if true {
-        Ok(())
+fn do_work(options: &Options) -> Result<()> {
+    let _ = svn::workingcopy_info()?;  // Make sure we are in a working copy.
+    let data = get_bisect_data()?;
+
+    if options.show_good {
+        println!("{}", data.good_name());
+    }
+    else if options.show_bad {
+        println!("{}", data.bad_name());
     }
     else {
-        Err(General("Failed..".to_string()).into())
+        println!("The term for the good state is {}", data.good_name().green());
+        println!("The term for the bad  state is {}", data.bad_name().red());
+        if let Some(status) = get_waiting_status(&data) {
+            println!("{}", status);
+        }
     }
+    Ok(())
 }

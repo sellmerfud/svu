@@ -10,9 +10,9 @@ pub struct Push;
 
 
 struct Options {
-    unversioned:         bool,
-    revert_working_copy: bool,
-    description:         Option<String>,
+    unversioned:        bool,
+    revert_workingcopy: bool,
+    description:        Option<String>,
 }
 
 impl Options {
@@ -21,8 +21,8 @@ impl Options {
         let description = matches.get_one::<String>("message").map(|m| m.to_owned());
 
         Options {
-            unversioned:         matches.get_flag("unversioned"),
-            revert_working_copy: !matches.get_flag("no-revert"),
+            unversioned:        matches.get_flag("unversioned"),
+            revert_workingcopy: !matches.get_flag("no-revert"),
             description,
         }
     }
@@ -76,7 +76,7 @@ fn create_patch_name() -> String {
 }
 
 fn do_command<'a>(options: &Options) -> Result<()> {
-    svn::working_copy_info()?;  // Make sure we are in a working copy.
+    svn::workingcopy_info()?;  // Make sure we are in a working copy.
     let wc_root = svn::workingcopy_root(Path::new(".")).unwrap();
     let items = get_stash_items(&wc_root, options.unversioned)?;
 
@@ -104,7 +104,7 @@ fn do_command<'a>(options: &Options) -> Result<()> {
         };
         add_stash_entry(&stash)?;
 
-        if options.revert_working_copy {
+        if options.revert_workingcopy {
             // Lastly we revert the working copy.
             // We will explicitly revert all entries to ensure that the --remove-added flag is honored.
             // For added/unversioned directories we do not need to revert any entries below them
