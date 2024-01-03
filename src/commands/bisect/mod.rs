@@ -346,3 +346,89 @@ fn mark_bad_revision(revision: &str) -> Result<bool> {
         Ok(false)
     }
 }
+
+//  Returns true if the perform_bisect() reports that the session is complete
+fn mark_skipped_revisions(incoming_skipped: &HashSet<String>) -> Result<bool> {
+    let mut data = get_bisect_data()?;
+    let mut new_skipped: Vec<String> =
+        incoming_skipped
+        .difference(&data.skipped)
+        .map(|r| r.clone())
+        .collect();
+
+    if new_skipped.is_empty() {
+        Ok(false)
+    } else {
+        let skipped: HashSet<String> =
+            data.skipped
+            .union(incoming_skipped)
+            .map(|r| r.clone())
+            .collect();       
+        data = BisectData { skipped, ..data };
+        save_bisect_data(&data)?;
+        new_skipped.sort_by(|a, b| b.cmp(a)); // Sorted most recent first
+        for rev in &new_skipped {
+            log_bisect_revision(rev, "skip")?;
+        }
+
+        if data.is_ready() {
+            perform_bisect(&data)
+        }
+        else {
+            Ok(false)
+        }
+    }
+}
+
+//  Returns true if the perform_bisect() reports that the session is complete
+fn mark_unskipped_revisions(incoming_unskipped: &HashSet<String>) -> Result<bool> {
+    let mut data = get_bisect_data()?;
+    let mut new_unskipped: Vec<String> =
+        incoming_unskipped
+        .intersection(&data.skipped)
+        .map(|r| r.clone())
+        .collect();
+
+    if new_unskipped.is_empty() {
+        Ok(false)
+    } else {
+        let skipped: HashSet<String> =
+            data.skipped
+            .difference(incoming_unskipped)
+            .map(|r| r.clone())
+            .collect();       
+        data = BisectData { skipped, ..data };
+        save_bisect_data(&data)?;
+        new_unskipped.sort_by(|a, b| b.cmp(a)); // Sorted most recent first
+        for rev in &new_unskipped {
+            log_bisect_revision(rev, "unskip")?;
+        }
+
+        if data.is_ready() {
+            perform_bisect(&data)
+        }
+        else {
+            Ok(false)
+        }
+    }
+}
+
+//  Used by skip and unskip.
+//  Each rev_str is either a single revision or a range rev:rev.
+//  These value should be resovlved to be well formed (see: resolved_revision_range())
+//  This function gathers the actual revision numbers that lie within each range
+//  for the given path.
+fn gather_revisions(rev_str: &str, path: &str) -> Result<HashSet<String>> {
+    let mut revisions = HashSet::new();
+
+    if rev_str.contains(':') {
+        let resolved = svn::resolve_revision_range(rev_str, path)?;
+        let entries = svn::log(&vec![path], &vec![&resolved], false, None, false, false)?;
+        revisions.extend(entries.iter().map(|e| e.revision.clone()));
+    }
+    else {
+        revisions.insert(svn::resolve_revision(rev_str, path)?);
+    }
+
+    Ok(revisions)
+}

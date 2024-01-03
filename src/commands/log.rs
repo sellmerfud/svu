@@ -2,7 +2,6 @@
 use regex::Regex;
 use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
-use crate::commands::bisect::replay;
 use crate::svn::{self, LogEntry};
 use crate::util::{self, StringWrapper};
 use colored::*;
