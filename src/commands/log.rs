@@ -68,6 +68,7 @@ impl SvCommand for Log {
     fn clap_command(&self) -> Command {
         Command::new(self.name())
             .about("Display formatted log entries")
+            .aliases(vec!["l", "l1"])
             .after_help("By default shows only the first line of each commit message (see --full)\n\
                         If only 1 revision is given and it is not a range then :0 is appended to make it a range.\n\
                         If no revision is given and the first path looks like a revision it will be treated as one."

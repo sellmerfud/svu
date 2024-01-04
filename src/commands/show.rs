@@ -39,6 +39,7 @@ impl SvCommand for Show {
 
     fn clap_command(&self) -> Command {
         Command::new(self.name())
+            .aliases(vec!{"s", "sh"})
             .about("Show the details of a commit")
             .after_help("The revision defaults to the current working copy revision.\n\
             If no revision is given and the first path looks like a revision it will be treated as one.\n\
