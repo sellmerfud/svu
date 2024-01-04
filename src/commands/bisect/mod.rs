@@ -212,10 +212,6 @@ fn log_bisect_command(cmd_line: &Vec<String>) -> Result<()> {
     append_to_log(line)
 }
 
-fn display_bisect_command(cmd_line: &Vec<String>) -> () {
-    println!("{}", cmd_line.join(" "));
-}
-
 //  Convert a revision to a numerica value.
 //  !! This assumes that the revision has been
 //  resolved and contains only digits !!
