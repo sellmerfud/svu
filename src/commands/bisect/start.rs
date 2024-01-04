@@ -125,7 +125,8 @@ fn do_work(options: &Options) -> Result<()> {
             append_to_log("#! /usr/bin/env sh\n")?;
             append_to_log(format!("# {} bisect log file {}", cmd_name, display_svn_datetime(&Local::now())))?;
             append_to_log(format!("# Initiated from: {}", current_dir()?.to_string_lossy()))?;
-            append_to_log("-------------------------------------------------------------")?;
+            append_to_log("# -----------------------------------------------------------------")?;
+            append_to_log("set -e\n")?;
             if let Some(rev) = &data.max_rev {
                 log_bisect_revision(rev, data.bad_name())?;
             }

@@ -2,6 +2,7 @@
 use clap::{Command, Arg, ArgMatches};
 use super::*;
 use anyhow::Result;
+use std::process;
 
 pub struct Replay;
 
@@ -36,12 +37,23 @@ fn build_options(matches: &ArgMatches) -> Options {
     }
 }
 
-fn do_work(_options: &Options) -> Result<()> {
+fn do_work(options: &Options) -> Result<()> {
     svn::workingcopy_info()?;  // Make sure we are in a working copy.
-    if true {
+    let mut args = Vec::new();
+    args.push("-c".to_string());
+    args.push(options.log_fiie.clone());
+
+    let cmd = process::Command::new("/bin/sh")
+        .args(args)
+        .stdout(process::Stdio::inherit())
+        .stderr(process::Stdio::inherit())
+        .output()?;
+
+    if cmd.status.success() {
         Ok(())
     }
     else {
-        Err(General("Failed..".to_string()).into())
+        Err(General("Log replay did not finish successfully".to_string()).into())
     }
+
 }
