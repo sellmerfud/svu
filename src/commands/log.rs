@@ -10,7 +10,7 @@ use super::SvCommand;
 
 pub struct Log;
 struct Options {
-    limit:        Option<usize>,
+    limit:        Option<u32>,
     author:       bool,
     date:         bool,
     time:         bool,
@@ -54,7 +54,7 @@ impl Options {
             reverse:      matches.get_flag("reverse"),
             show_paths:   matches.get_flag("show-paths"),
             stop_on_copy: matches.get_flag("stop-on-copy"),
-            limit:        matches.get_one::<usize>("limit").copied(),
+            limit:        matches.get_one::<u32>("limit").copied(),
             revisions,
             regexes,
             paths
@@ -78,7 +78,7 @@ impl SvCommand for Log {
                     .short('l')
                     .long("limit")
                     .value_name("num")
-                    .value_parser(clap::value_parser!(u16).range(1..))
+                    .value_parser(clap::value_parser!(u32).range(1..))
                     .help("Limit the number of commits displayed")
             )
             .arg(

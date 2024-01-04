@@ -179,7 +179,7 @@ fn get_revision_number(rev: &str, delta: i32, path: &str) -> Result<String> {
         d if d < 0 => format!("{}:0", rev),
         _          => format!("{}:HEAD", rev),
     };
-    let limit = Some(delta.abs() as usize + 1);
+    let limit = Some(delta.abs() as u32 + 1);
     let entries = log(&vec![path], &vec![&rev_str], false, limit, false, false)?;
     match entries.last() {
         Some(log) => Ok(log.revision.to_owned()),
@@ -406,7 +406,7 @@ pub fn log<S>(
     paths: &Vec<S>,
     revisions: &Vec<S>,
     include_msg: bool,
-    limit: Option<usize>,
+    limit: Option<u32>,
     stop_on_copy: bool,
     include_paths: bool) -> Result<Vec<LogEntry>>
         where S: AsRef<str> + Display
