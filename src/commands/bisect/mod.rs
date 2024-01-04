@@ -28,8 +28,8 @@ pub mod bad;
 pub mod terms;
 pub mod skip;
 pub mod unskip;
-pub mod run;
 pub mod log;
+pub mod run;
 pub mod replay;
 pub mod reset;
 
@@ -42,8 +42,8 @@ pub fn bisect_commands<'a>() -> Vec<&'a dyn BisectCommand> {
         &terms::Terms,
         &skip::Skip,
         &unskip::Unskip,
-        &run::Run,
         &log::Log,
+        &run::Run,
         &replay::Replay,
         &reset::Reset,
     ]

@@ -47,7 +47,7 @@ fn do_work(options: &Options) -> Result<()> {
     let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
     let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
     let wc_root_path = wc_root.to_string_lossy();
-    let _ = get_bisect_data()?;  // Ensure a session has started
+    let _ = get_bisect_data()?;  // Ensure a bisect session has started
 
     let mut skipped = HashSet::<String>::new();
     for rev in &options.revisions {
