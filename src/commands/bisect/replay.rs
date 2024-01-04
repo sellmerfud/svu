@@ -39,11 +39,13 @@ fn build_options(matches: &ArgMatches) -> Options {
 
 fn do_work(options: &Options) -> Result<()> {
     svn::workingcopy_info()?;  // Make sure we are in a working copy.
+    let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
     let mut args = Vec::new();
     args.push("-c".to_string());
     args.push(options.log_fiie.clone());
 
     let cmd = process::Command::new("/bin/sh")
+        .current_dir(wc_root)
         .args(args)
         .stdout(process::Stdio::inherit())
         .stderr(process::Stdio::inherit())

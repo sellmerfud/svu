@@ -1,9 +1,7 @@
 
-use clap::{Command, Arg, ArgMatches};
+use clap::{Command, ArgMatches};
 use super::*;
 use anyhow::Result;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 
 pub struct Log;
 
