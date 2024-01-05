@@ -22,12 +22,12 @@ struct Options {
 impl Options {
     fn build_options(matches: &ArgMatches) -> Options {
 
-        let branch_regexes = match matches.get_many::<Regex>("branch") {
+        let branch_regexes = match matches.get_many::<Regex>("branches") {
             Some(regexes) => regexes.map(|r| r.to_owned()).collect(),
             None => vec![]
         };
 
-        let tag_regexes = match matches.get_many::<Regex>("tag") {
+        let tag_regexes = match matches.get_many::<Regex>("tags") {
             Some(regexes) => regexes.map(|r| r.to_owned()).collect(),
             None => vec![]
         };
@@ -58,7 +58,7 @@ impl SvCommand for FileRevs {
                          --branch and --tag may be specified multiple times.\n"
             )
             .arg(
-                Arg::new("branch")
+                Arg::new("branches")
                     .short('b')
                     .long("branches")
                     .value_name("regex")
@@ -69,7 +69,7 @@ impl SvCommand for FileRevs {
             .arg(
                 Arg::new("tags")
                     .short('t')
-                    .long("tag")
+                    .long("tags")
                     .value_name("regex")
                     .value_parser(Regex::new)
                     .action(clap::ArgAction::Append)
