@@ -60,14 +60,14 @@ impl SvCommand for FileRevs {
             .arg(
                 Arg::new("branch")
                     .short('b')
-                    .long("branch")
+                    .long("branches")
                     .value_name("regex")
                     .value_parser(Regex::new)
                     .action(clap::ArgAction::Append)
                     .help("Include branches that match <regex>")
             )
             .arg(
-                Arg::new("tag")
+                Arg::new("tags")
                     .short('t')
                     .long("tag")
                     .value_name("regex")
