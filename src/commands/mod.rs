@@ -1,5 +1,7 @@
 
 use clap::ArgMatches;
+use std::path::Path;
+use std::sync::OnceLock;
 
 pub trait SvCommand {
     fn name(&self) -> &'static str;
@@ -29,3 +31,12 @@ pub fn sub_commands<'a>() -> Vec<&'a dyn SvCommand> {
         &ignore::Ignore
     ]
 }
+
+pub fn arg0() -> &'static String {
+    static ARG0: OnceLock<String> = OnceLock::new();
+    ARG0.get_or_init(|| {
+        let full = std::env::args().take(1).collect::<String>();
+        Path::new(&full).file_name().unwrap().to_string_lossy().to_string()
+    })
+}
+

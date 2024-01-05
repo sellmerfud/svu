@@ -1,7 +1,7 @@
 
 // use anyhow::Result;
 use clap::Command;
-use crate::commands::{sub_commands, SvCommand};
+use crate::commands::{sub_commands, SvCommand, arg0};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -19,10 +19,11 @@ impl <'a> App<'a> {
 
     fn build_app<'b>(subs: &'b Vec<&'b dyn SvCommand>) -> Command
     {
+        let help = format!("For help about a particular command type '{} help COMMAND'", arg0());
         let mut cmd = Command::new("svr")
             .version(VERSION)
             .about("Subversion utilities")
-            .after_help("For help about a particular command type 'svr help COMMAND'");
+            .after_help(help);
 
         //  Add clap subcommmands
         for sub in subs {

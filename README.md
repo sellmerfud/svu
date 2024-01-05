@@ -2,10 +2,10 @@
 A small utility that adds some useful functionality for working with Subversion repositories.
 
 ```
-$ svr -h
+$ svu -h
 Subversion utilities
 
-Usage: svr [COMMAND]
+Usage: svu [COMMAND]
 
 Commands:
   log       Display formatted log entries
@@ -22,7 +22,7 @@ Options:
   -h, --help     Print help
   -V, --version  Print version
 
-For help about a particular command type 'svr help COMMAND'
+For help about a particular command type 'svu help COMMAND'
 ```
 ## License
 

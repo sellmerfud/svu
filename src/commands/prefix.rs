@@ -4,7 +4,7 @@ use clap::{Command, Arg, ArgMatches};
 use crate::svn;
 use crate::util::SvError::*;
 
-use super::SvCommand;
+use super::{SvCommand, arg0};
 
 
 pub struct Prefix;
@@ -70,17 +70,18 @@ impl SvCommand for Prefix {
     fn name(&self) -> &'static str { "prefix" }
 
     fn clap_command(&self) -> Command {
+        let after_help = format!("By default `{}` assumes that your repository is using the default prefixes:\n\
+                     ^/trunk\n\
+                     ^/branches\n\
+                     ^/tags\n\
+                     \n\
+                     You can use this command to configure other prefixes so that the `branch` and\n\
+                     `filerevs` commands can find them.\n\
+                     \n\
+                     All prefixes must start with '^/'", arg0());
         Command::new(self.name())
             .about("Display and configure repository prefixes")
-            .after_help("By default `sv` assumes that your repository is using the default prefixes:\n\
-                         ^/trunk\n\
-                         ^/branches\n\
-                         ^/tags\n\
-                         \n\
-                         You can use this command to configure other prefixes so that the `branch` and\n\
-                         `filerevs` commands can find them.\n\
-                         \n\
-                         All prefixes must start with '^/'")
+            .after_help(after_help)
             .arg(
                 Arg::new("add-branch")
                     .long("add-branch")
