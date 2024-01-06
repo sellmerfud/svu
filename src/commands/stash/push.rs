@@ -67,7 +67,7 @@ impl StashCommand for Push {
 }
 
 fn get_log_message_1st(wc_root: &Path) -> Result<String> {
-    let log = svn::log(&vec![wc_root.to_string_lossy()], &vec!["BASE:0".into()], true, Some(1), false, false)?;
+    let log = svn::log(&[wc_root.to_string_lossy()], &["BASE:0".into()], true, Some(1), false, false)?;
     Ok(log[0].msg_1st())
   }
 

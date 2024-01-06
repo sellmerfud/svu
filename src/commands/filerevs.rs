@@ -8,6 +8,7 @@ use super::SvCommand;
 use crate::util::{SvError::*, join_paths, display_svn_datetime};
 use crate::svn::{self, Prefixes, SvnInfo};
 use chrono::Local;
+use std::fmt::Display;
 pub struct FileRevs;
 
 #[derive(Debug)]
@@ -80,7 +81,7 @@ impl SvCommand for FileRevs {
                     .short('B')
                     .long("all-branches")
                     .action(clap::ArgAction::SetTrue)
-                    .conflicts_with("branch")
+                    .conflicts_with("branches")
                     .help("Display all branches")
             )
             .arg(
@@ -88,7 +89,7 @@ impl SvCommand for FileRevs {
                     .short('T')
                     .long("all-tags")
                     .action(clap::ArgAction::SetTrue)
-                    .conflicts_with("tag")
+                    .conflicts_with("tags")
                     .help("Display all tags")
             )
             .arg(
@@ -105,7 +106,7 @@ impl SvCommand for FileRevs {
     }
 }
 
-fn get_branches(root_url: &str, all: bool, regexes: &Vec<Regex>, prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
+fn get_branches(root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
     let mut branches = Vec::<String>::new();
     if all || !regexes.is_empty() {
         let mut all_prefixes = prefixes.branch_prefixes.clone();
@@ -130,7 +131,7 @@ fn get_branches(root_url: &str, all: bool, regexes: &Vec<Regex>, prefixes: &Pref
     Ok(branches.into_iter())
 }
 
-fn get_tags(root_url: &str, all: bool, regexes: &Vec<Regex>, prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
+fn get_tags(root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
     let mut tags = Vec::<String>::new();
     if all || !regexes.is_empty() {
         let mut all_prefixes = prefixes.tag_prefixes.clone();
@@ -187,14 +188,16 @@ fn show_results(options: &Options) -> Result<()> {
 //  to its subversion prefix.
 //  Find find the url entry for one of our prefixes
 //  so we can determine where the relative path starts.
-fn get_svn_rel_path(rel_url: &str, sorted_prefixes: &Vec<String>) -> Result<String> {
+fn get_svn_rel_path<S>(rel_url: &str, sorted_prefixes: &[S]) -> Result<String>
+    where S: AsRef<str> + Display,
+{
     let prefix = sorted_prefixes.iter().find(|p| {
-        rel_url[2..].starts_with(*p) // Skip the leading ^/
+        rel_url[2..].starts_with(p.as_ref()) // Skip the leading ^/
     });
     match prefix {
         Some(prefix) =>
             // Skip ^/<prefix>/
-            Ok(rel_url[prefix.len() + 3..].to_string()),
+            Ok(rel_url[prefix.as_ref().len() + 3..].to_string()),
         None => {
             let msg = format!("Cannot determine relative path for {}", rel_url);
             Err(General(msg).into())
@@ -206,7 +209,7 @@ fn max_width(label: &str, value_widths: impl Iterator<Item = usize>) -> usize {
     value_widths.fold(label.len(), |m, v| m.max(v))
 }
 
-fn get_chunks(prefixes: &Vec<String>, num_cpus: usize) -> Vec<Vec<String>> {
+fn get_chunks(prefixes: &[String], num_cpus: usize) -> Vec<Vec<String>> {
     let per_chunck  = prefixes.len() / num_cpus;
     let extra       = prefixes.len() % num_cpus;
     let mut chunks  = Vec::new();
@@ -231,7 +234,7 @@ fn get_chunks(prefixes: &Vec<String>, num_cpus: usize) -> Vec<Vec<String>> {
 // trunk               7601
 // branches/8.1        7645
 // tags/8.1.1-GA       7625
-fn show_path_result(root_url: &str, path_entry: &SvnInfo, prefixes: &Vec<String>, sorted_prefixes: &Vec<String>) -> Result<()> {
+fn show_path_result(root_url: &str, path_entry: &SvnInfo, prefixes: &[String], sorted_prefixes: &[String]) -> Result<()> {
     use std::{thread, io};
     struct Entry(String, Option<Box<SvnInfo>>);
 

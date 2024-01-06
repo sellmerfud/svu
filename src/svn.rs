@@ -1,5 +1,6 @@
 
 use std::env;
+use std::ffi::OsStr;
 use std::io::Write;
 use std::sync::OnceLock;
 use std::process::{Command, Output};
@@ -105,7 +106,9 @@ pub struct SvnStatus {
     pub entries: Vec<StatusEntry>,
 }
 
-pub fn run_svn(args: &Vec<String>, cwd: Option<&Path>) -> Result<Output> {
+pub fn run_svn<S>(args: &[S], cwd: Option<&Path>) -> Result<Output> 
+    where S: AsRef<OsStr> + Display
+{
     let mut cmd = Command::new(svn_cmd());
     if let Some(dir) = cwd {
         cmd.current_dir(dir);
@@ -180,7 +183,7 @@ fn get_revision_number(rev: &str, delta: i32, path: &str) -> Result<String> {
         _          => format!("{}:HEAD", rev),
     };
     let limit = Some(delta.abs() as u32 + 1);
-    let entries = log(&vec![path], &vec![&rev_str], false, limit, false, false)?;
+    let entries = log(&[path], &[&rev_str], false, limit, false, false)?;
     match entries.last() {
         Some(log) => Ok(log.revision.to_owned()),
         None      => {
@@ -335,15 +338,17 @@ pub fn info<'a>(path: &'a str, revision: Option<&'a str>) -> Result<SvnInfo>
     }
 }
 
-pub fn info_list<S>(paths: &Vec<String>, revision: Option<S>) -> Result<Vec<SvnInfo>> 
+pub fn info_list<S>(paths: &[S], revision: Option<S>) -> Result<Vec<SvnInfo>> 
     where S: AsRef<str> + Display {
 
-        let mut args = Vec::new();
-        args.extend(vec!["info".to_string(), "--xml".to_string()]);
+        let mut args: Vec<&str> = Vec::new();
+        args.extend(&["info", "--xml"]);
+        let rev_arg: String;
         if let Some(rev) = revision {
-            args.push(format!("--revision={}", rev));
+            rev_arg = format!("--revision={}", rev);
+            args.push(rev_arg.as_str());
         }
-        args.extend(paths.to_vec());
+        args.extend(paths.iter().map(|s| s.as_ref()).collect::<Vec<&str>>());
         let output = run_svn(&args, CWD)?;
         if output.status.success() {
             let text = String::from_utf8_lossy(&output.stdout);
@@ -403,8 +408,8 @@ fn parse_svn_log(text: &str) -> Result<Vec<LogEntry>> {
 
 //  Run the svn log command
 pub fn log<S>(
-    paths: &Vec<S>,
-    revisions: &Vec<S>,
+    paths: &[S],
+    revisions: &[S],
     include_msg: bool,
     limit: Option<u32>,
     stop_on_copy: bool,
@@ -466,7 +471,9 @@ fn parse_svn_list(text: &str) -> Result<Vec<SvnList>> {
 
 
 // Get svn list for multiple paths
-pub fn path_lists(paths: &Vec<String>) -> Result<Vec<SvnList>> {
+pub fn path_lists<S>(paths: &[S]) -> Result<Vec<SvnList>>
+    where S: AsRef<str> + Display
+{
     if paths.is_empty() {
         Ok(vec![])
     }
@@ -486,7 +493,7 @@ pub fn path_lists(paths: &Vec<String>) -> Result<Vec<SvnList>> {
 
 //  Get svn list for a single path.
 pub fn path_list(path: &str) -> Result<SvnList> {
-    let mut xx = path_lists(&vec![path.to_owned()])?;
+    let mut xx = path_lists(&[path.to_owned()])?;
     Ok(xx.remove(0))
 }
 
@@ -603,17 +610,18 @@ pub fn status<S>(path: S, cwd: Option<&Path>) -> Result<SvnStatus>
 
 }
 
-pub fn add<S>(paths: &Vec<String>, depth: S, auto_props: bool, cwd: Option<&Path>) -> Result<()>
-    where S: AsRef<str> + Display
+pub fn add<S, T>(paths: &[S], depth: T, auto_props: bool, cwd: Option<&Path>) -> Result<()>
+    where S: AsRef<str> + Display,
+          T: AsRef<str> + Display
 {
     let depth_arg = format!("--depth={}", depth);
-    let props_arg = (if auto_props { "--auto-props" } else {"--no-auto-props"}).to_string();
+    let props_arg = if auto_props { "--auto-props" } else {"--no-auto-props"};
     let mut args = Vec::new();
-    args.push("add".to_string());
-    args.push(depth_arg);
+    args.push("add");
+    args.push(depth_arg.as_str());
     args.push(props_arg);
     for path in paths {
-        args.push(path.to_owned());
+        args.push(path.as_ref());
     }
     let output = run_svn(&args, cwd)?;
     if output.status.success() {
@@ -624,18 +632,19 @@ pub fn add<S>(paths: &Vec<String>, depth: S, auto_props: bool, cwd: Option<&Path
     }
 }
 
-pub fn revert<S>(paths: &Vec<String>, depth: S, remove_added: bool, cwd: Option<&Path>) -> Result<()>
+pub fn revert<S, T>(paths: &[S], depth: T, remove_added: bool, cwd: Option<&Path>) -> Result<()>
     where S: AsRef<str> + Display,
-{
+          T: AsRef<str> + Display
+    {
     let depth_arg = format!("--depth={}", depth);
     let mut args = Vec::new();
-    args.push("revert".to_string());
-    args.push(depth_arg);
+    args.push("revert");
+    args.push(depth_arg.as_str());
     if remove_added {
-        args.push("--remove-added".to_string());
+        args.push("--remove-added");
     }
     for path in paths {
-        args.push(path.to_owned());
+        args.push(path.as_ref());
     }
     let output = run_svn(&args, cwd)?;
     if output.status.success() {

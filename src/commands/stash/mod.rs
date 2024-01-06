@@ -200,7 +200,7 @@ fn add_stash_entry(stash: &StashFileEntry) -> Result<()> {
     Ok(serde_json::to_writer_pretty(writer, &entries)?)
 }
 
-fn save_stash_entries(entries: &Vec<StashFileEntry>) -> Result<()> {
+fn save_stash_entries(entries: &[StashFileEntry]) -> Result<()> {
     let writer = File::create(stash_entries_file()?)?;
     Ok(serde_json::to_writer_pretty(writer, entries)?)
 }

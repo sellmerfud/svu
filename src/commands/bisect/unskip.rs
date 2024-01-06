@@ -59,7 +59,7 @@ fn do_work(options: &Options) -> Result<()> {
     }
 
     mark_unskipped_revisions(&skipped)?;
-    log_bisect_command(&std::env::args().collect())?;
+    log_bisect_command(&std::env::args().collect::<Vec<String>>())?;
 
     let data = get_bisect_data()?; // Fresh copy of data
     if let Some(status) = get_waiting_status(&data) {

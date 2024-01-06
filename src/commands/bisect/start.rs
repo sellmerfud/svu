@@ -141,7 +141,7 @@ fn do_work(options: &Options) -> Result<()> {
             if data.is_ready() {
                 perform_bisect(&data)?;
             }
-            log_bisect_command(&std::env::args().collect())?;
+            log_bisect_command(&std::env::args().collect::<Vec<String>>())?;
             Ok(())
         }
     }

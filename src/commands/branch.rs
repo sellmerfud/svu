@@ -9,6 +9,7 @@ use crate::util::SvError::*;
 use crate::svn;
 use colored::*;
 use super::SvCommand;
+use std::fmt::Display;
 
 
 pub struct Branch;
@@ -150,11 +151,14 @@ fn show_list(options: &Options) -> Result<()> {
     Ok(())    
 }
 
-fn list_entries(header: &str, base_url: &str, prefixes: &Vec<String>, regex: &Option<Regex>, all_prefixes: &Vec<String>) -> Result<()> {
+fn list_entries<S, T>(header: &str, base_url: &str, prefixes: &[S], regex: &Option<Regex>, all_prefixes: &[T]) -> Result<()> 
+    where S: AsRef<str> + Display,
+          T: AsRef<str> + Display + PartialEq<str>,
+{
     //  If a path matches one of the branch/tag prefixes then we do not consider it
     //  an acceptable entry.  Also the entry must match the regex if present.
-    let acceptable = |path: &String| -> bool  {
-        !all_prefixes.contains(path) && regex.as_ref().map(|r| r.is_match(path.as_str())).unwrap_or(true)
+    let acceptable = |path: &str| -> bool  {
+        !all_prefixes.iter().any(|p| p.eq(path)) && regex.as_ref().map(|r| r.is_match(path)).unwrap_or(true)
     };
 
     println!();
@@ -165,7 +169,7 @@ fn list_entries(header: &str, base_url: &str, prefixes: &Vec<String>, regex: &Op
         let path_list = svn::path_list(util::join_paths(base_url, prefix).as_str())?;
         for entry in path_list.entries {
             let path = &util::join_paths(prefix, entry.name);
-            if acceptable(&path) {
+            if acceptable(path.as_str()) {
                 println!("{}{}", "^/".green(), path.green());
             }
         }

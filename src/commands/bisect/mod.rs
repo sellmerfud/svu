@@ -196,7 +196,7 @@ fn display_log() -> Result<()> {
 }
 
 fn get_1st_log_message(revision: &str) -> Result<String> {
-    let logs = svn::log(&vec![], &vec![revision.to_string()], true, Some(1), false,false)?;
+    let logs = svn::log(&[], &[revision.to_string()], true, Some(1), false,false)?;
     let msg = if let Some(log) = logs.first() { log.msg_1st() }
     else { "".to_string() };
     Ok(msg)
@@ -207,7 +207,7 @@ fn log_bisect_revision(revision: &str, term: &str) -> Result<()> {
     append_to_log(line)
 }
 
-fn log_bisect_command(cmd_line: &Vec<String>) -> Result<()> {
+fn log_bisect_command(cmd_line: &[String]) -> Result<()> {
     let line = format!("{}", cmd_line.join(" "));
     append_to_log(line)
 }
@@ -220,9 +220,9 @@ fn to_rev_num(rev: &str) -> usize {
 }
 
 fn get_workingcopy_bounds() -> Result<(String, String)> {
-    let first = svn::log(&vec![], &vec!["HEAD:0"], true, Some(1), false,false)?
+    let first = svn::log(&[], &["HEAD:0"], true, Some(1), false,false)?
         .first().unwrap().revision.clone();
-    let last = svn::log(&vec![], &vec!["0:HEAD"], true, Some(1), false,false)?
+    let last = svn::log(&[], &["0:HEAD"], true, Some(1), false,false)?
         .first().unwrap().revision.clone();
     Ok((first.clone(), last.clone()))
 }
@@ -231,7 +231,7 @@ fn get_extant_revisions(rev1: &str, rev2: &str) -> Result<Vec<String>> {
     let mut revisions = Vec::new();
     let range = format!("{}:{}", rev1, rev2);
     println!("Fetching history from revisions {} to {}", rev1.yellow(), rev2.yellow());
-    let logs = svn::log(&vec![], &vec![range], false, None, false, false)?;
+    let logs = svn::log(&[], &[range], false, None, false, false)?;
     for log in &logs {
         revisions.push(log.revision.clone());
     }
@@ -251,7 +251,7 @@ fn get_waiting_status(data: &BisectData) -> Option<String> {
 }
 
 fn get_log_entry(revision: &str, with_paths: bool) -> Result<Option<LogEntry>> {
-    let log = svn::log(&vec!["."], &vec![revision], true, Some(1), false, with_paths)?;
+    let log = svn::log(&["."], &[revision], true, Some(1), false, with_paths)?;
     Ok(log.first().map(|l| l.clone()))
 }
 
@@ -419,7 +419,7 @@ fn gather_revisions(rev_str: &str, path: &str) -> Result<HashSet<String>> {
 
     if rev_str.contains(':') {
         let resolved = svn::resolve_revision_range(rev_str, path)?;
-        let entries = svn::log(&vec![path], &vec![&resolved], false, None, false, false)?;
+        let entries = svn::log(&[path], &[&resolved], false, None, false, false)?;
         revisions.extend(entries.iter().map(|e| e.revision.clone()));
     }
     else {
