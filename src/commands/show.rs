@@ -100,6 +100,8 @@ impl SvCommand for Show {
             paths.push(".");
         }
 
+        let creds = crate::auth::get_credentials()?;
+
         //  Resolve the revision if necessary and coerce it into
         //  a vector
         //  In some cases when the revision is PREV, it may not produce a log entry 
@@ -108,12 +110,12 @@ impl SvCommand for Show {
         let mut rev_vector = Vec::<&str>::new();
         let mut resolved_rev: String;
         if let Some(rev) = revision {
-            resolved_rev = svn::resolve_revision_range(rev.as_str(), paths[0])?;
+            resolved_rev = svn::resolve_revision_range(&creds, rev.as_str(), paths[0])?;
             resolved_rev += ":0";
             rev_vector.push(resolved_rev.as_str());
         }
 
-        let log_entry = &svn::log(&paths, &rev_vector, true, Some(1), false, true)?[0];
+        let log_entry = &svn::log(&creds, &paths, &rev_vector, true, Some(1), false, true)?[0];
         util::show_commit(&log_entry, options.show_msg, options.show_paths);
         if options.show_diff {            
             println!();

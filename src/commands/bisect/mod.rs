@@ -2,6 +2,7 @@ use anyhow::Result;
 use chrono::Local;
 use clap::{Command, ArgMatches};
 use colored::Colorize;
+use crate::auth::Credentials;
 use crate::util::{SvError::*, show_commit};
 use super::SvCommand;
 use std::io::{BufRead, BufReader, Write};
@@ -196,7 +197,7 @@ fn display_log() -> Result<()> {
 }
 
 fn get_1st_log_message(revision: &str) -> Result<String> {
-    let logs = svn::log(&[], &[revision.to_string()], true, Some(1), false,false)?;
+    let logs = svn::log(&None, &[], &[revision.to_string()], true, Some(1), false,false)?;
     let msg = if let Some(log) = logs.first() { log.msg_1st() }
     else { "".to_string() };
     Ok(msg)
@@ -220,9 +221,9 @@ fn to_rev_num(rev: &str) -> usize {
 }
 
 fn get_workingcopy_bounds() -> Result<(String, String)> {
-    let first = svn::log(&[], &["HEAD:0"], true, Some(1), false,false)?
+    let first = svn::log(&None, &[], &["HEAD:0"], true, Some(1), false,false)?
         .first().unwrap().revision.clone();
-    let last = svn::log(&[], &["0:HEAD"], true, Some(1), false,false)?
+    let last = svn::log(&None, &[], &["0:HEAD"], true, Some(1), false,false)?
         .first().unwrap().revision.clone();
     Ok((first.clone(), last.clone()))
 }
@@ -231,7 +232,7 @@ fn get_extant_revisions(rev1: &str, rev2: &str) -> Result<Vec<String>> {
     let mut revisions = Vec::new();
     let range = format!("{}:{}", rev1, rev2);
     println!("Fetching history from revisions {} to {}", rev1.yellow(), rev2.yellow());
-    let logs = svn::log(&[], &[range], false, None, false, false)?;
+    let logs = svn::log(&None, &[], &[range], false, None, false, false)?;
     for log in &logs {
         revisions.push(log.revision.clone());
     }
@@ -251,7 +252,7 @@ fn get_waiting_status(data: &BisectData) -> Option<String> {
 }
 
 fn get_log_entry(revision: &str, with_paths: bool) -> Result<Option<LogEntry>> {
-    let log = svn::log(&["."], &[revision], true, Some(1), false, with_paths)?;
+    let log = svn::log(&None, &["."], &[revision], true, Some(1), false, with_paths)?;
     Ok(log.first().map(|l| l.clone()))
 }
 
@@ -414,16 +415,16 @@ fn mark_unskipped_revisions(incoming_unskipped: &HashSet<String>) -> Result<bool
 //  These value should be resovlved to be well formed (see: resolved_revision_range())
 //  This function gathers the actual revision numbers that lie within each range
 //  for the given path.
-fn gather_revisions(rev_str: &str, path: &str) -> Result<HashSet<String>> {
+fn gather_revisions(creds: &Option<Credentials>, rev_str: &str, path: &str) -> Result<HashSet<String>> {
     let mut revisions = HashSet::new();
 
     if rev_str.contains(':') {
-        let resolved = svn::resolve_revision_range(rev_str, path)?;
-        let entries = svn::log(&[path], &[&resolved], false, None, false, false)?;
+        let resolved = svn::resolve_revision_range(&creds, rev_str, path)?;
+        let entries = svn::log(&None, &[path], &[&resolved], false, None, false, false)?;
         revisions.extend(entries.iter().map(|e| e.revision.clone()));
     }
     else {
-        revisions.insert(svn::resolve_revision(rev_str, path)?);
+        revisions.insert(svn::resolve_revision(&creds, rev_str, path)?);
     }
 
     Ok(revisions)

@@ -7,6 +7,7 @@ pub mod app;
 pub mod util;
 pub mod commands;
 pub mod svn;
+pub mod auth;
 
 fn run() -> Result<()> {
     let app = app::App::new();

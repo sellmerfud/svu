@@ -4,6 +4,7 @@ use std::env::current_dir;
 use regex::Regex;
 use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
+use crate::auth::Credentials;
 use crate::util;
 use crate::util::SvError::*;
 use crate::svn;
@@ -108,7 +109,8 @@ impl SvCommand for Branch {
             show_current_branch(&options)
         }
         else {
-            show_list(&options)
+            let creds = crate::auth::get_credentials()?;
+            show_list(&creds, &options)
         }
     }
 }
@@ -131,9 +133,9 @@ fn show_current_branch(options: &Options) -> Result<()> {
     Ok(())    
 }
 
-fn show_list(options: &Options) -> Result<()> {
+fn show_list(creds: &Option<Credentials>, options: &Options) -> Result<()> {
 
-    let base_url = svn::info(&options.path, None)?.root_url;
+    let base_url = svn::info(creds, &options.path, None)?.root_url;
     let prefixes = svn::load_prefixes()?;
     let mut all_prefixes = prefixes.branch_prefixes.clone();
     all_prefixes.extend(prefixes.tag_prefixes.clone());
@@ -141,17 +143,17 @@ fn show_list(options: &Options) -> Result<()> {
     if options.list_branches() {
         let mut sorted_prefixes = prefixes.branch_prefixes.clone();
         sorted_prefixes.sort();
-        list_entries("Branches", &base_url, &sorted_prefixes, &options.branch_regex, &all_prefixes)?
+        list_entries(creds, "Branches", &base_url, &sorted_prefixes, &options.branch_regex, &all_prefixes)?
     }
     if options.list_tags() {
         let mut sorted_prefixes = prefixes.tag_prefixes.clone();
         sorted_prefixes.sort();
-        list_entries("Tags", &base_url, &sorted_prefixes, &options.tag_regex, &all_prefixes)?
+        list_entries(creds, "Tags", &base_url, &sorted_prefixes, &options.tag_regex, &all_prefixes)?
     }
     Ok(())    
 }
 
-fn list_entries<S, T>(header: &str, base_url: &str, prefixes: &[S], regex: &Option<Regex>, all_prefixes: &[T]) -> Result<()> 
+fn list_entries<S, T>(creds: &Option<Credentials>,header: &str, base_url: &str, prefixes: &[S], regex: &Option<Regex>, all_prefixes: &[T]) -> Result<()> 
     where S: AsRef<str> + Display,
           T: AsRef<str> + Display + PartialEq<str>,
 {
@@ -166,7 +168,7 @@ fn list_entries<S, T>(header: &str, base_url: &str, prefixes: &[S], regex: &Opti
     println!("----------------------");
 
     for prefix in prefixes {
-        let path_list = svn::path_list(util::join_paths(base_url, prefix).as_str())?;
+        let path_list = svn::path_list(creds, util::join_paths(base_url, prefix).as_str())?;
         for entry in path_list.entries {
             let path = &util::join_paths(prefix, entry.name);
             if acceptable(path.as_str()) {

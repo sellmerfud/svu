@@ -52,6 +52,7 @@ fn build_options(matches: &ArgMatches) -> Options {
 }
 
 fn do_work(options: &Options) -> Result<()> {
+    let creds = crate::auth::get_credentials()?;
     let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
     let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
     let wc_path = wc_root.to_string_lossy();
@@ -59,7 +60,7 @@ fn do_work(options: &Options) -> Result<()> {
     if let Some(data) = load_bisect_data()? {
         if !options.no_update {
             let revision = options.revision.as_ref()
-                .map(|r| resolve_revision(&r, &wc_path))
+                .map(|r| resolve_revision(&creds, &r, &wc_path))
                 .unwrap_or(Ok(data.original_rev))?;
             update_workingcopy(&revision)?;
         }

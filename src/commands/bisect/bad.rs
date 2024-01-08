@@ -51,11 +51,12 @@ fn build_options(matches: &ArgMatches) -> Options {
 }
 
 fn do_work(options: &Options) -> Result<()> {
+    let creds = crate::auth::get_credentials()?;
     let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
     let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
     let data = get_bisect_data()?;
     let revision = match &options.revision {
-        Some(rev) => svn::resolve_revision(&rev, &wc_root.to_string_lossy().as_ref())?,
+        Some(rev) => svn::resolve_revision(&creds, &rev, &wc_root.to_string_lossy().as_ref())?,
         None      => wc_info.commit_rev,
     };
 

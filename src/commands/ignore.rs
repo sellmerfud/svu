@@ -1,6 +1,7 @@
 
 use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
+use crate::auth::{Credentials, push_creds};
 use crate::svn;
 use crate::util::{self, StringWrapper};
 use crate::util::SvError::*;
@@ -46,18 +47,18 @@ fn is_directory<S>(path: S) -> bool
         Path::new(path.as_ref()).is_dir()
 }
 
-fn is_working_directory(path: &str) -> Result<bool> {
-    let info = svn::info(path, None)?;
+fn is_working_directory(creds: &Option<Credentials>, path: &str) -> Result<bool> {
+    let info = svn::info(creds, path, None)?;
     Ok(info.wc_path.is_some() && info.kind == "dir")
 }
 
-fn get_ignores(path: &str, global: bool) -> Result<Option<String>> {
+fn get_ignores(creds: &Option<Credentials>, path: &str, global: bool) -> Result<Option<String>> {
     let prop = (if global { "svn:global-ignores" } else { "svn:ignore" }).to_owned();
-    let args = vec![
-        "pget".to_owned(),
-        prop,
-        path.to_string()
-    ];
+    let mut args = Vec::new();
+    args.push("pget".to_owned());
+    push_creds(&mut args, creds);
+    args.push(prop);
+    args.push(path.to_string());
     let output = svn::run_svn(&args, svn::CWD)?;
     if output.status.success() {
         Ok(Some(String::from_utf8_lossy(&output.stdout).into_owned()))
@@ -69,10 +70,11 @@ fn get_ignores(path: &str, global: bool) -> Result<Option<String>> {
 }
 
 fn write_ignore_entries(options: &Options) -> Result<()> {
+    let creds = crate::auth::get_credentials()?;
     let prefix_len = options.path.chomp('/').len() + 1; // Add one for trailing slash
 
-    fn svn_ignore(dir_path: &str, prefix_len: usize) -> Result<()> {
-        if let Some(ignore_output) = get_ignores(dir_path, false)? {
+    fn svn_ignore(creds: &Option<Credentials>, dir_path: &str, prefix_len: usize) -> Result<()> {
+        if let Some(ignore_output) = get_ignores(creds, dir_path, false)? {
             let ignores = ignore_output
             .split("\n")
             .map(|l| l.trim())  // Clean up and skip blank lines
@@ -92,7 +94,7 @@ fn write_ignore_entries(options: &Options) -> Result<()> {
         }
 
 
-        if let Some(ignore_output) = get_ignores(dir_path, true)? {
+        if let Some(ignore_output) = get_ignores(creds, dir_path, true)? {
             let global_ignores = ignore_output
                         .split("\n")
                         .map(|l| l.trim())  // Clean up and skip blank lines
@@ -112,21 +114,21 @@ fn write_ignore_entries(options: &Options) -> Result<()> {
         }
 
         //  Recursively process all subdirectories
-        let path_list = svn::path_list(dir_path)?;
+        let path_list = svn::path_list(&creds, dir_path)?;
         for sub_dir in &path_list.entries {
             if sub_dir.kind == "dir" {
                 let subdir_path = util::join_paths(dir_path, sub_dir.name.chomp('/'));
-                svn_ignore(&subdir_path, prefix_len)?;
+                svn_ignore(creds, &subdir_path, prefix_len)?;
             }
         }
         Ok(())
     }
 
-    if !is_working_directory(&options.path)? {
+    if !is_working_directory(&creds, &options.path)? {
         let msg  = format!("{} is not a subversion working copy directory", options.path);
         Err(General(msg).into())
     }
     else {
-        svn_ignore(&options.path, prefix_len)
+        svn_ignore(&creds, &options.path, prefix_len)
     }
 }

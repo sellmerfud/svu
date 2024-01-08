@@ -5,6 +5,7 @@ use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
 use colored::*;
 use super::SvCommand;
+use crate::auth::Credentials;
 use crate::util::{SvError::*, join_paths, display_svn_datetime};
 use crate::svn::{self, Prefixes, SvnInfo};
 use chrono::Local;
@@ -106,7 +107,7 @@ impl SvCommand for FileRevs {
     }
 }
 
-fn get_branches(root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
+fn get_branches(creds: &Option<Credentials>, root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
     let mut branches = Vec::<String>::new();
     if all || !regexes.is_empty() {
         let mut all_prefixes = prefixes.branch_prefixes.clone();
@@ -119,7 +120,7 @@ fn get_branches(root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixe
         };
 
         for prefix in &branch_prefixes {
-            let path_list = svn::path_list(&join_paths(root_url, prefix))?;
+            let path_list = svn::path_list(&creds, &join_paths(root_url, prefix))?;
             for entry in &path_list.entries {
                 let branch = join_paths(prefix, &entry.name);
                 if acceptable(&branch) {
@@ -131,7 +132,7 @@ fn get_branches(root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixe
     Ok(branches.into_iter())
 }
 
-fn get_tags(root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
+fn get_tags(creds: &Option<Credentials>, root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
     let mut tags = Vec::<String>::new();
     if all || !regexes.is_empty() {
         let mut all_prefixes = prefixes.tag_prefixes.clone();
@@ -144,7 +145,7 @@ fn get_tags(root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -
         };
 
         for prefix in &tag_prefixes {
-            let path_list = svn::path_list(&join_paths(root_url, prefix))?;
+            let path_list = svn::path_list(&creds, &join_paths(root_url, prefix))?;
             for entry in &path_list.entries {
                 let tag = join_paths(prefix, &entry.name);
                 if acceptable(&tag) {
@@ -157,8 +158,10 @@ fn get_tags(root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -
 }
 
 fn show_results(options: &Options) -> Result<()> {
+    let creds = crate::auth::get_credentials()?;
+
         // First make sure all paths are rooted in the same repository
-    let path_list = svn::info_list(&options.paths, None::<String>)?;
+    let path_list = svn::info_list(&creds, &options.paths, None::<String>)?;
     let repo_uuid = &path_list[0].repo_uuid;
     for item in &path_list[1..] {
         if &item.repo_uuid != repo_uuid {
@@ -168,8 +171,8 @@ fn show_results(options: &Options) -> Result<()> {
 
     let root_url    = &path_list[0].root_url;
     let prefix_info = svn::load_prefixes()?;
-    let branches    = get_branches(root_url, options.all_branches, &options.branch_regexes, &prefix_info)?;
-    let tags        = get_tags(root_url, options.all_tags, &options.tag_regexes, &prefix_info)?;
+    let branches    = get_branches(&creds, root_url, options.all_branches, &options.branch_regexes, &prefix_info)?;
+    let tags        = get_tags(&creds, root_url, options.all_tags, &options.tag_regexes, &prefix_info)?;
 
     let prefixes: Vec<String> = vec![prefix_info.trunk_prefix]
         .into_iter()
@@ -179,7 +182,7 @@ fn show_results(options: &Options) -> Result<()> {
     sorted_prefixes.sort_by(|a, b| a.len().cmp(&b.len()).reverse());  // Sorteed by length longest first.
 
     for path_entry in &path_list {
-        show_path_result(root_url, path_entry, &prefixes, &sorted_prefixes)?;
+        show_path_result(&creds, root_url, path_entry, &prefixes, &sorted_prefixes)?;
     }
     Ok(())
 }
@@ -234,15 +237,15 @@ fn get_chunks(prefixes: &[String], num_cpus: usize) -> Vec<Vec<String>> {
 // trunk               7601
 // branches/8.1        7645
 // tags/8.1.1-GA       7625
-fn show_path_result(root_url: &str, path_entry: &SvnInfo, prefixes: &[String], sorted_prefixes: &[String]) -> Result<()> {
+fn show_path_result(creds: &Option<Credentials>, root_url: &str, path_entry: &SvnInfo, prefixes: &[String], sorted_prefixes: &[String]) -> Result<()> {
     use std::{thread, io};
     struct Entry(String, Option<Box<SvnInfo>>);
 
-    fn process_prefixes(root_url: &str, rel_path: &str, prefixes: Vec<String>) -> io::Result<Vec<Entry>> {
+    fn process_prefixes(creds: Option<Credentials>, root_url: &str, rel_path: &str, prefixes: Vec<String>) -> io::Result<Vec<Entry>> {
         let mut results = Vec::<Entry>::new();
         for prefix in prefixes {
             let path = join_paths(join_paths(root_url, prefix.as_str()), rel_path);
-            let info = svn::info(path.as_str(), Some("HEAD")).ok().map(|i| Box::new(i));
+            let info = svn::info(&creds, path.as_str(), Some("HEAD")).ok().map(|i| Box::new(i));
             results.push(Entry(prefix, info));
         }
         Ok(results)
@@ -258,8 +261,9 @@ fn show_path_result(root_url: &str, path_entry: &SvnInfo, prefixes: &[String], s
         for prefix_list in prefix_chunks {
             let r = root_url.to_string();
             let p = rel_path.clone();
+            let c = creds.clone();
             threads.push(
-                thread::spawn(move || process_prefixes(&r,&p, prefix_list))
+                thread::spawn(move || process_prefixes(c, &r,&p, prefix_list))
             );
         }
     
@@ -273,7 +277,7 @@ fn show_path_result(root_url: &str, path_entry: &SvnInfo, prefixes: &[String], s
         for prefix in prefixes {
             // let path = join_paths(join_paths(root_url, prefix), rel_path);
             let path = join_paths(join_paths(root_url, prefix.as_str()), rel_path.as_str());
-            let info = svn::info(path.as_str(), Some("HEAD")).ok().map(|i| Box::new(i));
+            let info = svn::info(&creds, path.as_str(), Some("HEAD")).ok().map(|i| Box::new(i));
             results.push(Entry(prefix.clone(), info));
         }
     }

@@ -9,18 +9,19 @@ use std::fs::File;
 use chrono::{DateTime, Local};
 use roxmltree::{Document, Node};
 use anyhow::Result;
+use crate::auth::Credentials;
 use crate::util::SvError::*;
 use crate::util::{parse_svn_date_opt, null_date, data_directory};
 use regex::Regex;
 use std::fmt::Display;
 use serde::{Deserialize, Serialize};
-
+use crate::auth::push_creds;
 //  Get the name of the svn command to run
 //  Use "svn" (on the path as the default)
 fn svn_cmd() -> &'static String {
     static SVN_CMD: OnceLock<String> = OnceLock::new();
     SVN_CMD.get_or_init(|| {
-        env::var("SV_SVN").map(|s| s.clone()).unwrap_or("svn".to_string())
+        env::var("SVU_SVN").map(|s| s.clone()).unwrap_or("svn".to_string())
     })
 }
 
@@ -176,14 +177,14 @@ pub fn looks_like_revision_range(text: &str) -> bool {
 
 //  Use svn log to verify that the revision string refers to a
 //  valid revision.
-fn get_revision_number(rev: &str, delta: i32, path: &str) -> Result<String> {
+fn get_revision_number(creds: &Option<Credentials>, rev: &str, delta: i32, path: &str) -> Result<String> {
     let rev_str = match delta {
         0          =>  rev.to_string(),
         d if d < 0 => format!("{}:0", rev),
         _          => format!("{}:HEAD", rev),
     };
     let limit = Some(delta.abs() as u32 + 1);
-    let entries = log(&[path], &[&rev_str], false, limit, false, false)?;
+    let entries = log(&creds, &[path], &[&rev_str], false, limit, false, false)?;
     match entries.last() {
         Some(log) => Ok(log.revision.to_owned()),
         None      => {
@@ -193,7 +194,7 @@ fn get_revision_number(rev: &str, delta: i32, path: &str) -> Result<String> {
     }
 }
 
-pub fn resolve_revision(rev_string: &str, path: &str) -> Result<String> {
+pub fn resolve_revision(creds: &Option<Credentials>, rev_string: &str, path: &str) -> Result<String> {
     fn err(r: &str, d: &str, p: &str) -> Result<String> {
         let msg = format!("Cannot resolve revision '{}{}' for path '{}'", r, d, p);
         Err(General(msg).into())
@@ -202,10 +203,10 @@ pub fn resolve_revision(rev_string: &str, path: &str) -> Result<String> {
         None => err(rev_string, "", path),
         Some(caps) => {
             match (caps.get(1), caps.get(2)) {
-                (Some(rev), None) => get_revision_number(rev.as_str(), 0, path).or(err(rev.as_str(), "", path)),
+                (Some(rev), None) => get_revision_number(creds, rev.as_str(), 0, path).or(err(rev.as_str(), "", path)),
                 (Some(rev), Some(delta)) => {
                     let d = delta.as_str().parse::<i32>()?;
-                    get_revision_number(rev.as_str(), d, path).or(err(rev.as_str(), delta.as_str(), path))
+                    get_revision_number(creds, rev.as_str(), d, path).or(err(rev.as_str(), delta.as_str(), path))
                }
                _ => unreachable!("resolve_revision_string, fell through match!")
             }
@@ -217,14 +218,14 @@ pub fn resolve_revision(rev_string: &str, path: &str) -> Result<String> {
 //  If the string contains a revision keyword or if it contains a delta expression
 //  then we must use svn log to get the actual revsion.
 //  In order to resovle the string using svn log we need a working copy path.
-pub fn resolve_revision_range(rev_string: &str, path: &str) -> Result<String> {
+pub fn resolve_revision_range(creds: &Option<Credentials>, rev_string: &str, path: &str) -> Result<String> {
     let parts: Vec<&str> = rev_string.split(":").collect();
     let re = Regex::new(r"[-+]")?;
     match parts.len() {
-        1 => resolve_revision(&parts[0], path),
+        1 => resolve_revision(creds, &parts[0], path),
         2 => {
-            let a = if re.is_match(&parts[0]) {resolve_revision(&parts[0], path)? } else { parts[0].to_string()} ;
-            let b = if re.is_match(&parts[1]) {resolve_revision(&parts[1], path)? } else { parts[1].to_string()} ;
+            let a = if re.is_match(&parts[0]) {resolve_revision(creds, &parts[0], path)? } else { parts[0].to_string()} ;
+            let b = if re.is_match(&parts[1]) {resolve_revision(creds, &parts[1], path)? } else { parts[1].to_string()} ;
             Ok(format!("{}:{}", a, b))
         }
         _ => {
@@ -270,7 +271,7 @@ pub fn workingcopy_root(working_dir: &Path) -> Option<PathBuf> {
 pub fn current_branch(path: &Path) -> Result<(String, String)> {
     match workingcopy_root(path) {
         Some(wc_root) => {
-            let path_info = info(wc_root.to_string_lossy().as_ref(), None)?;
+            let path_info = info(&None, wc_root.to_string_lossy().as_ref(), None)?;
             Ok((path_info.rel_url, path_info.commit_rev))
         }
         None => {
@@ -318,11 +319,11 @@ fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
     Ok(entries)
 }
 
-pub fn info<'a>(path: &'a str, revision: Option<&'a str>) -> Result<SvnInfo>
-    {
+pub fn info<'a>(creds: &Option<Credentials>, path: &'a str, revision: Option<&'a str>) -> Result<SvnInfo> {
 
     let mut args = Vec::new();
     args.extend(vec!["info".to_string(), "--xml".to_string()]);
+    push_creds(&mut args, creds);
     if let Some(rev) = revision {
         args.push(format!("--revision={}", rev));
     }
@@ -338,17 +339,18 @@ pub fn info<'a>(path: &'a str, revision: Option<&'a str>) -> Result<SvnInfo>
     }
 }
 
-pub fn info_list<S>(paths: &[S], revision: Option<S>) -> Result<Vec<SvnInfo>> 
+pub fn info_list<S>(creds: &Option<Credentials>, paths: &[S], revision: Option<S>) -> Result<Vec<SvnInfo>> 
     where S: AsRef<str> + Display {
 
-        let mut args: Vec<&str> = Vec::new();
-        args.extend(&["info", "--xml"]);
+        let mut args: Vec<String> = Vec::new();
+        args.extend(["info".to_string(), "--xml".to_string()]);
+        push_creds(&mut args, creds);
         let rev_arg: String;
         if let Some(rev) = revision {
             rev_arg = format!("--revision={}", rev);
-            args.push(rev_arg.as_str());
+            args.push(rev_arg);
         }
-        args.extend(paths.iter().map(|s| s.as_ref()).collect::<Vec<&str>>());
+        args.extend(paths.iter().map(|s| s.to_string()).collect::<Vec<String>>());
         let output = run_svn(&args, CWD)?;
         if output.status.success() {
             let text = String::from_utf8_lossy(&output.stdout);
@@ -408,6 +410,7 @@ fn parse_svn_log(text: &str) -> Result<Vec<LogEntry>> {
 
 //  Run the svn log command
 pub fn log<S>(
+    creds: &Option<Credentials>,
     paths: &[S],
     revisions: &[S],
     include_msg: bool,
@@ -419,6 +422,7 @@ pub fn log<S>(
 
     let mut args = Vec::new();
     args.extend(vec!["log".to_string(), "--xml".to_string()]);
+    push_creds(&mut args, creds);
     if !include_msg  { args.push("--quiet".to_string()) }
     if stop_on_copy  { args.push("--stop-on_copy".to_string()) }
     if include_paths { args.push("--verbose".to_string()) }
@@ -471,7 +475,7 @@ fn parse_svn_list(text: &str) -> Result<Vec<SvnList>> {
 
 
 // Get svn list for multiple paths
-pub fn path_lists<S>(paths: &[S]) -> Result<Vec<SvnList>>
+pub fn path_lists<S>(creds: &Option<Credentials>, paths: &[S]) -> Result<Vec<SvnList>>
     where S: AsRef<str> + Display
 {
     if paths.is_empty() {
@@ -479,6 +483,7 @@ pub fn path_lists<S>(paths: &[S]) -> Result<Vec<SvnList>>
     }
     else {
         let mut args = vec!["list".to_owned(), "--xml".to_owned()];
+        push_creds(&mut args, creds);
         args.extend(paths.into_iter().map(|p| p.to_string()));
         let output = run_svn(&args, CWD)?;
         if output.status.success() {
@@ -492,8 +497,8 @@ pub fn path_lists<S>(paths: &[S]) -> Result<Vec<SvnList>>
 }
 
 //  Get svn list for a single path.
-pub fn path_list(path: &str) -> Result<SvnList> {
-    let mut xx = path_lists(&[path.to_owned()])?;
+pub fn path_list(creds: &Option<Credentials>, path: &str) -> Result<SvnList> {
+    let mut xx = path_lists(creds, &[path.to_owned()])?;
     Ok(xx.remove(0))
 }
 
@@ -557,7 +562,7 @@ pub fn save_prefixes(prefixes: &Prefixes) -> Result<()> {
 //  Returns the info for the current directory or
 //  and Error if not withing a working copy.
 pub fn workingcopy_info() -> Result<SvnInfo> {
-    if let Ok(wc_info) = info(".", None) {
+    if let Ok(wc_info) = info(&None, ".", None) {
         Ok(wc_info)
     }
     else {

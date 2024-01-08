@@ -74,6 +74,7 @@ fn build_options(matches: &ArgMatches) -> Options {
 
 fn do_work(options: &Options) -> Result<()> {
     let cmd_name: String = std::env::args().take(1).collect();
+    let creds = crate::auth::get_credentials()?;
     let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
     
     match load_bisect_data()? {
@@ -88,10 +89,10 @@ fn do_work(options: &Options) -> Result<()> {
         },
         None => {
             let good = options.good_rev.as_ref()
-                .map(|rev| svn::resolve_revision(&rev, "."))
+                .map(|rev| svn::resolve_revision(&creds, &rev, "."))
                 .transpose()?;
             let bad = options.bad_rev.as_ref()
-                .map(|rev| svn::resolve_revision(&rev, "."))
+                .map(|rev| svn::resolve_revision(&creds, &rev, "."))
                 .transpose()?;
 
             match (&good, &bad) {

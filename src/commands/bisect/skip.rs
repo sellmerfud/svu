@@ -48,6 +48,7 @@ fn build_options(matches: &ArgMatches) -> Options {
 
 
 fn do_work(options: &Options) -> Result<()> {
+    let creds = crate::auth::get_credentials()?;
     let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
     let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
     let wc_root_path = wc_root.to_string_lossy();
@@ -55,7 +56,7 @@ fn do_work(options: &Options) -> Result<()> {
 
     let mut skipped = HashSet::<String>::new();
     for rev in &options.revisions {
-        skipped.extend(gather_revisions(rev, &wc_root_path)?);
+        skipped.extend(gather_revisions(&creds, rev, &wc_root_path)?);
     }
     //  If not revisions specified, use the working copy rev
     if skipped.is_empty() {

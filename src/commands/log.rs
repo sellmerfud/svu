@@ -1,7 +1,9 @@
 
+
 use regex::Regex;
 use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
+use crate::auth::Credentials;
 use crate::svn::{self, LogEntry};
 use crate::util::{self, StringWrapper};
 use colored::*;
@@ -174,7 +176,7 @@ impl SvCommand for Log {
     }
 }
 
-fn get_log_entries(options: &Options) -> Result<Vec<LogEntry>> {
+fn get_log_entries(options: &Options, creds: &Option<Credentials>) -> Result<Vec<LogEntry>> {
     let mut revisions = options.revisions.clone();
     let mut paths = options.paths.clone();
     
@@ -191,7 +193,7 @@ fn get_log_entries(options: &Options) -> Result<Vec<LogEntry>> {
     let resolve_path = paths.first().map(|p| p.as_str()).unwrap_or(".");
     let mut resolved_revs = Vec::new();
     for rev in &revisions {
-        resolved_revs.push(svn::resolve_revision_range(rev.as_str(), resolve_path)?);
+        resolved_revs.push(svn::resolve_revision_range(creds, rev.as_str(), resolve_path)?);
     }
 
     if resolved_revs.len() == 1 && !resolved_revs[0].contains(':') {
@@ -199,6 +201,7 @@ fn get_log_entries(options: &Options) -> Result<Vec<LogEntry>> {
     }
 
     let entries = svn::log(
+        creds,
         &paths,
         &resolved_revs,
         true,  // include_msg
@@ -235,7 +238,10 @@ fn show_results(options: &Options) -> Result<()> {
         }
     }
 
-    let mut entries = get_log_entries(options)?;
+
+    let creds = crate::auth::get_credentials()?;
+
+    let mut entries = get_log_entries(options, &creds)?;
 
     //  In the case where we are showing `incoming` commits
     //  we will have a single revision of "HEAD:BASE".
@@ -246,11 +252,11 @@ fn show_results(options: &Options) -> Result<()> {
                         options.revisions.len() == 1 &&
                         options.revisions[0] == "HEAD:BASE" {
         let wc_path = options.paths.first().map(|p| p.as_str()).unwrap_or(".");
-        let path_info = svn::info(wc_path, None)?;
+        let path_info = svn::info(&creds, wc_path, None)?;
         if path_info.kind == "dir" {
             Some(path_info.commit_rev)
         } else {
-            let parent_info = svn::info(&parent_dir(&wc_path), None)?;
+            let parent_info = svn::info(&creds, &parent_dir(&wc_path), None)?;
             Some(parent_info.commit_rev)
         }
     } else {
