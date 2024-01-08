@@ -322,7 +322,7 @@ fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
 pub fn info<'a>(creds: &Option<Credentials>, path: &'a str, revision: Option<&'a str>) -> Result<SvnInfo> {
 
     let mut args = Vec::new();
-    args.extend(vec!["info".to_string(), "--xml".to_string()]);
+    args.extend_from_slice(&["info".to_string(), "--xml".to_string()]);
     push_creds(&mut args, creds);
     if let Some(rev) = revision {
         args.push(format!("--revision={}", rev));
@@ -343,7 +343,7 @@ pub fn info_list<S>(creds: &Option<Credentials>, paths: &[S], revision: Option<S
     where S: AsRef<str> + Display {
 
         let mut args: Vec<String> = Vec::new();
-        args.extend(["info".to_string(), "--xml".to_string()]);
+        args.extend_from_slice(&["info".to_string(), "--xml".to_string()]);
         push_creds(&mut args, creds);
         let rev_arg: String;
         if let Some(rev) = revision {
@@ -421,7 +421,7 @@ pub fn log<S>(
     {
 
     let mut args = Vec::new();
-    args.extend(vec!["log".to_string(), "--xml".to_string()]);
+    args.extend_from_slice(&["log".to_string(), "--xml".to_string()]);
     push_creds(&mut args, creds);
     if !include_msg  { args.push("--quiet".to_string()) }
     if stop_on_copy  { args.push("--stop-on_copy".to_string()) }
@@ -601,7 +601,7 @@ pub fn status<S>(path: S, cwd: Option<&Path>) -> Result<SvnStatus>
     where S: AsRef<str> + Display
 {
     let mut args = Vec::new();
-    args.extend(vec!["status".to_string(), "--xml".to_string()]);
+    args.extend_from_slice(&["status".to_string(), "--xml".to_string()]);
     args.push(path.to_string());
 
     let output = run_svn(&args, cwd)?;
