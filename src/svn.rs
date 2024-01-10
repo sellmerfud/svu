@@ -570,10 +570,6 @@ pub fn workingcopy_info() -> Result<SvnInfo> {
     }
 }
 
-pub fn in_workingcopy() -> bool {
-    workingcopy_info().is_ok()
-}
-
 fn parse_svn_status(text: &str) -> Result<SvnStatus> {
     let mut entries: Vec<StatusEntry> = vec![];
     let doc = Document::parse(text)?;

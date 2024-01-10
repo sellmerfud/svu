@@ -9,14 +9,14 @@ pub trait SvCommand {
     fn run(&self, matches: &ArgMatches) -> anyhow::Result<()>;
 }
 
-pub mod log;
-pub mod branch;
-pub mod show;
-pub mod filerevs;
-pub mod stash;
-pub mod bisect;
-pub mod prefix;
-pub mod ignore;
+mod log;
+mod branch;
+mod show;
+mod filerevs;
+mod stash;
+mod bisect;
+mod prefix;
+mod ignore;
 
 /// Return a vector of all of the sv subcommands.
 pub fn sub_commands<'a>() -> Vec<&'a dyn SvCommand> {

@@ -22,13 +22,13 @@ pub trait StashCommand {
     fn run(&self, matches: &ArgMatches) -> anyhow::Result<()>;
 }
 
-pub mod push;
-pub mod pop;
-pub mod apply;
-pub mod drop;
-pub mod list;
-pub mod show;
-pub mod clear;
+mod push;
+mod pop;
+mod apply;
+mod drop;
+mod list;
+mod show;
+mod clear;
 
 /// Return a vector of all of the stash subcommands.
 pub fn stash_commands<'a>() -> Vec<&'a dyn StashCommand> {

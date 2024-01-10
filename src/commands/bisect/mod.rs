@@ -23,16 +23,16 @@ pub trait BisectCommand {
     fn run(&self, matches: &ArgMatches) -> anyhow::Result<()>;
 }
 
-pub mod start;
-pub mod good;
-pub mod bad;
-pub mod terms;
-pub mod skip;
-pub mod unskip;
-pub mod log;
-pub mod run;
-pub mod replay;
-pub mod reset;
+mod start;
+mod good;
+mod bad;
+mod terms;
+mod skip;
+mod unskip;
+mod log;
+mod run;
+mod replay;
+mod reset;
 
 /// Return a vector of all of the bisect subcommands.
 pub fn bisect_commands<'a>() -> Vec<&'a dyn BisectCommand> {

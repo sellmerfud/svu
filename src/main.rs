@@ -3,11 +3,11 @@ use std::process;
 use anyhow::Result;
 use util::SvError;
 
-pub mod app;
-pub mod util;
-pub mod commands;
-pub mod svn;
-pub mod auth;
+mod app;
+mod util;
+mod commands;
+mod svn;
+mod auth;
 
 fn run() -> Result<()> {
     let app = app::App::new();
