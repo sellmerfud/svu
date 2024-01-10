@@ -117,7 +117,7 @@ pub fn run_svn<S>(args: &[S], cwd: Option<&Path>) -> Result<Output>
     Ok(cmd.args(args).output()?)
 }
 
-pub const CWD: Option<&Path> = None;
+pub const USE_CWD: Option<&Path> = None;
 
 fn get_attr(n: &Node, name: &str) -> String { 
     n.attribute(name).unwrap_or("").to_owned()
@@ -328,7 +328,7 @@ pub fn info<'a>(creds: &Option<Credentials>, path: &'a str, revision: Option<&'a
         args.push(format!("--revision={}", rev));
     }
     args.push(path.to_string());
-    let output = run_svn(&args, CWD)?;
+    let output = run_svn(&args, USE_CWD)?;
     if output.status.success() {
         let text = String::from_utf8_lossy(&output.stdout);
         let info = parse_svn_info(&text)?;
@@ -351,7 +351,7 @@ pub fn info_list<S>(creds: &Option<Credentials>, paths: &[S], revision: Option<S
             args.push(rev_arg);
         }
         args.extend(paths.iter().map(|s| s.to_string()).collect::<Vec<String>>());
-        let output = run_svn(&args, CWD)?;
+        let output = run_svn(&args, USE_CWD)?;
         if output.status.success() {
             let text = String::from_utf8_lossy(&output.stdout);
             parse_svn_info(&text)
@@ -429,7 +429,7 @@ pub fn log<S>(
     args.extend(limit.into_iter().map(|l| format!("--limit={}", l)));
     args.extend(revisions.into_iter().map(|r| format!("--revision={}", r)));
     args.extend(paths.into_iter().map(|p| p.to_string()));
-    let output = run_svn(&args, CWD)?;
+    let output = run_svn(&args, USE_CWD)?;
     if output.status.success() {
         let text = String::from_utf8_lossy(&output.stdout);
         parse_svn_log(&text)
@@ -485,7 +485,7 @@ pub fn path_lists<S>(creds: &Option<Credentials>, paths: &[S]) -> Result<Vec<Svn
         let mut args = vec!["list".to_owned(), "--xml".to_owned()];
         push_creds(&mut args, creds);
         args.extend(paths.into_iter().map(|p| p.to_string()));
-        let output = run_svn(&args, CWD)?;
+        let output = run_svn(&args, USE_CWD)?;
         if output.status.success() {
             let text = String::from_utf8_lossy(&output.stdout);
             parse_svn_list(&text)
@@ -510,7 +510,7 @@ pub fn change_diff(path: &str, commit_rev: &str) -> Result<Vec<String>> {
         path.to_string()
     ];
 
-    let output = run_svn(&args, CWD)?;
+    let output = run_svn(&args, USE_CWD)?;
     if output.status.success() {
         let text = String::from_utf8_lossy(&output.stdout);
         Ok(text.split("\n").map(|l| l.to_string()).collect())

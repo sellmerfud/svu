@@ -59,7 +59,7 @@ fn get_ignores(creds: &Option<Credentials>, path: &str, global: bool) -> Result<
     push_creds(&mut args, creds);
     args.push(prop);
     args.push(path.to_string());
-    let output = svn::run_svn(&args, svn::CWD)?;
+    let output = svn::run_svn(&args, svn::USE_CWD)?;
     if output.status.success() {
         Ok(Some(String::from_utf8_lossy(&output.stdout).into_owned()))
     }
