@@ -120,7 +120,7 @@ pub fn display_svn_datetime(date: &DateTime<Local>) -> String {
     }
 }
 
-pub mod datetime_serializer {
+pub(crate) mod datetime_serializer {
     use chrono::{DateTime, Local};
     use serde::{self, Deserialize, Serializer, Deserializer};
     // use anyhow::Result;
