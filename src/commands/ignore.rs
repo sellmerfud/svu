@@ -3,7 +3,7 @@ use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
 use crate::auth::{Credentials, push_creds};
 use crate::svn;
-use crate::util::{self, StringWrapper};
+use crate::util;
 use crate::util::SvError::*;
 use std::path::Path;
 use std::fmt::Display;
@@ -71,7 +71,7 @@ fn get_ignores(creds: &Option<Credentials>, path: &str, global: bool) -> Result<
 
 fn write_ignore_entries(options: &Options) -> Result<()> {
     let creds = crate::auth::get_credentials()?;
-    let prefix_len = options.path.chomp('/').len() + 1; // Add one for trailing slash
+    let prefix_len = options.path.trim_end_matches('/').len() + 1; // Add one for trailing slash
 
     fn svn_ignore(creds: &Option<Credentials>, dir_path: &str, prefix_len: usize) -> Result<()> {
         if let Some(ignore_output) = get_ignores(creds, dir_path, false)? {
@@ -81,7 +81,7 @@ fn write_ignore_entries(options: &Options) -> Result<()> {
             .filter(|l| !l.is_empty());
 
             for ignore in ignores {
-                let ignore_path  = util::join_paths(dir_path, ignore.to_owned().chomp('/'));
+                let ignore_path  = util::join_paths(dir_path, ignore.to_owned().trim_end_matches('/'));
                 // We prefix each path with a slash so that it refers to the
                 // specific entry as per .gitignore rules.
                 // See: https://git-scm.com/docs/gitignore
@@ -101,7 +101,7 @@ fn write_ignore_entries(options: &Options) -> Result<()> {
                         .filter(|l| !l.is_empty());
             for global_ignore in global_ignores {
                 let base_path   = util::join_paths(dir_path, "**");
-                let ignore_path = util::join_paths(base_path, global_ignore.to_owned().chomp('/'));
+                let ignore_path = util::join_paths(base_path, global_ignore.to_owned().trim_end_matches('/'));
                 // We prefix each path with a slash so that it refers to the
                 // specific entry as per .gitignore rules.
                 // See: https://git-scm.com/docs/gitignore
@@ -117,7 +117,7 @@ fn write_ignore_entries(options: &Options) -> Result<()> {
         let path_list = svn::path_list(&creds, dir_path)?;
         for sub_dir in &path_list.entries {
             if sub_dir.kind == "dir" {
-                let subdir_path = util::join_paths(dir_path, sub_dir.name.chomp('/'));
+                let subdir_path = util::join_paths(dir_path, sub_dir.name.trim_end_matches('/'));
                 svn_ignore(creds, &subdir_path, prefix_len)?;
             }
         }

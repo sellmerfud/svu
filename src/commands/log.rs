@@ -5,7 +5,7 @@ use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
 use crate::auth::Credentials;
 use crate::svn::{self, LogEntry};
-use crate::util::{self, StringWrapper};
+use crate::util;
 use colored::*;
 use chrono::{DateTime, Local};
 use super::SvCommand;
@@ -228,7 +228,7 @@ fn show_results(options: &Options) -> Result<()> {
     fn parent_dir(path: &str) -> String {
         let re = Regex::new(r"^(.*)/[^/]+").expect("Error parsing parent_dir regex");
         let mut local_path = path.to_owned();
-        local_path = local_path.chomp('/').to_owned();
+        local_path = local_path.trim_end_matches('/').to_owned();
 
         if let Some(caps) = re.captures(&local_path) {
             caps[1].to_owned()

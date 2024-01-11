@@ -17,16 +17,6 @@ pub enum SvError {
     SvnError(std::process::Output),
 }
 
-pub trait StringWrapper {
-    fn chomp<'a>(&'a self, ch: char) -> &'a str;
-}
-
-impl StringWrapper for String {
-    fn chomp<'a>(&'a self, ch: char) -> &'a str {
-        self.trim_end_matches(ch)
-    }
-}
-
 pub fn join_paths<S, T>(base: S, leaf: T) -> String
     where S: AsRef<str>, T: AsRef<str> {
     let mut path = String::new();
