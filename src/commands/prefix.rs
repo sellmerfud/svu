@@ -1,7 +1,7 @@
 
 use anyhow::Result;
 use clap::{Command, Arg, ArgMatches};
-use crate::svn;
+use crate::{svn, util};
 use crate::util::SvError::*;
 
 use super::{SvCommand, arg0};
@@ -178,13 +178,14 @@ fn prefix_operations(options: &Options) -> Result<()> {
         svn::save_prefixes(&prefixes)?;
     }
 
+    let divider = util::divider(40);
     //  Finally display all of the configured prefixes to stdout.
     println!("Trunk prefix");
-    println!("-----------------------------------------");
+    println!("{}", divider);
     println!("^/{}", prefixes.trunk_prefix);
 
     println!("\nBranch prefixes");
-    println!("-----------------------------------------");
+    println!("{}", divider);
     let mut sorted = prefixes.branch_prefixes;
     sorted.sort();
     for prefix in &sorted {
@@ -192,7 +193,7 @@ fn prefix_operations(options: &Options) -> Result<()> {
     }
 
     println!("\nTag prefixes");
-    println!("-----------------------------------------");
+    println!("{}", divider);
     let mut sorted = prefixes.tag_prefixes;
     sorted.sort();
     for prefix in &sorted {

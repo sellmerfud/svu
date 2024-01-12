@@ -133,13 +133,18 @@ pub(crate) mod datetime_serializer {
 
 }
 
+pub fn divider(len: usize) -> String {
+    vec!['-'; len].iter().collect()
+}
+
 //  Print formatted commit info to stdout.
 pub fn show_commit(log_entry: &LogEntry, show_msg: bool, show_paths: bool) -> () {
-    println!("-------------------------------------------------------------------");
+    let divider = divider(70);
+    println!("{}", divider);
     println!("Commit: {}", log_entry.revision.yellow());
     println!("Author: {}", log_entry.author.cyan());
     println!("Date  : {}", display_svn_datetime(&log_entry.date).magenta());
-    println!("-------------------------------------------------------------------");
+    println!("{}", divider);
 
     if show_msg {
         for line in &log_entry.msg {

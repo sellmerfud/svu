@@ -17,34 +17,28 @@ pub struct Branch;
 struct Options {
     all_branches:        bool,
     all_tags:            bool,
-    branch_regex:        Option<Regex>,
-    tag_regex:           Option<Regex>,
+    branch_regexes:      Vec<Regex>,
+    tag_regexes:         Vec<Regex>,
     path:                String,
 }
 
 impl Options {
     fn build_options(matches: &ArgMatches) -> Options {
-        let (all_branches, branch_regex) = if matches.contains_id("branch") {
-            if let Some(re) = matches.get_one::<Regex>("branch") {
-                (false, Some(re.to_owned()))
-            }
-            else { (true, None) }
-        }
-        else { (false, None) };
+        let branch_regexes = match matches.get_many::<Regex>("branch") {
+            Some(regexes) => regexes.map(|r| r.to_owned()).collect(),
+            None => vec![]
+        };
 
-        let (all_tags, tag_regex) = if matches.contains_id("tag") {
-            if let Some(re) = matches.get_one::<Regex>("tag") {
-                (false, Some(re.to_owned()))
-            }
-            else { (true, None) }
-        }
-        else { (false, None) };
+        let tag_regexes = match matches.get_many::<Regex>("tag") {
+            Some(regexes) => regexes.map(|r| r.to_owned()).collect(),
+            None => vec![]
+        };
 
         Options {
-            all_branches,
-            all_tags,
-            branch_regex,
-            tag_regex,
+            all_branches: matches.get_flag("all-branches"),
+            all_tags:     matches.get_flag("all-tags"),
+            branch_regexes,
+            tag_regexes,
             path: matches.get_one::<String>("path").unwrap().to_string(),
         }
     }
@@ -52,16 +46,16 @@ impl Options {
     fn no_arguments(&self) -> bool {
         self.all_branches == false &&
         self.all_tags == false &&
-        self.branch_regex.is_none() &&
-        self.tag_regex.is_none()
+        self.branch_regexes.is_empty() &&
+        self.tag_regexes.is_empty()
     }
 
     fn list_branches(&self) -> bool {
-        self.all_branches || self.branch_regex.is_some()
+        self.all_branches || !self.branch_regexes.is_empty()
     }
 
     fn list_tags(&self) -> bool {
-        self.all_tags || self.tag_regex.is_some()
+        self.all_tags || !self.tag_regexes.is_empty()
     }
 }
 
@@ -81,8 +75,8 @@ impl SvCommand for Branch {
                     .long("branches")
                     .value_name("regex")
                     .value_parser(Regex::new)
-                    .num_args(0..=1)
-                    .help("Display branches in the repository")
+                    .action(clap::ArgAction::Append)
+                    .help("Display branches in the repository that match <regex>")
             )
             .arg(
                 Arg::new("tag")
@@ -90,8 +84,24 @@ impl SvCommand for Branch {
                     .long("tags")
                     .value_name("regex")
                     .value_parser(Regex::new)
-                    .num_args(0..=1)
-                    .help("Display tags in the repository")
+                    .action(clap::ArgAction::Append)
+                    .help("Display tags in the repository that match <regex>")
+            )
+            .arg(
+                Arg::new("all-branches")
+                    .short('B')
+                    .long("all-branches")
+                    .action(clap::ArgAction::SetTrue)
+                    .conflicts_with("branch")
+                    .help("Display all branches in the repository")
+            )
+            .arg(
+                Arg::new("all-tags")
+                    .short('T')
+                    .long("all-tags")
+                    .action(clap::ArgAction::SetTrue)
+                    .conflicts_with("tag")
+                    .help("Display all tags in the repository")
             )
             .arg(
                 Arg::new("path")
@@ -143,29 +153,30 @@ fn show_list(creds: &Option<Credentials>, options: &Options) -> Result<()> {
     if options.list_branches() {
         let mut sorted_prefixes = prefixes.branch_prefixes.clone();
         sorted_prefixes.sort();
-        list_entries(creds, "Branches", &base_url, &sorted_prefixes, &options.branch_regex, &all_prefixes)?
+        list_entries(creds, "Branches", &base_url, &sorted_prefixes, &options.branch_regexes, &all_prefixes)?
     }
     if options.list_tags() {
         let mut sorted_prefixes = prefixes.tag_prefixes.clone();
         sorted_prefixes.sort();
-        list_entries(creds, "Tags", &base_url, &sorted_prefixes, &options.tag_regex, &all_prefixes)?
+        list_entries(creds, "Tags", &base_url, &sorted_prefixes, &options.tag_regexes, &all_prefixes)?
     }
     Ok(())    
 }
 
-fn list_entries<S, T>(creds: &Option<Credentials>,header: &str, base_url: &str, prefixes: &[S], regex: &Option<Regex>, all_prefixes: &[T]) -> Result<()> 
+fn list_entries<S, T>(creds: &Option<Credentials>,header: &str, base_url: &str, prefixes: &[S], regexes: &[Regex], all_prefixes: &[T]) -> Result<()> 
     where S: AsRef<str> + Display,
           T: AsRef<str> + Display + PartialEq<str>,
 {
     //  If a path matches one of the branch/tag prefixes then we do not consider it
     //  an acceptable entry.  Also the entry must match the regex if present.
     let acceptable = |path: &str| -> bool  {
-        !all_prefixes.iter().any(|p| p.eq(path)) && regex.as_ref().map(|r| r.is_match(path)).unwrap_or(true)
+        !all_prefixes.iter().any(|p| p.eq(path)) &&
+        (regexes.is_empty() || regexes.iter().any(|r| r.is_match(path)))
     };
 
     println!();
     println!("{}", header);
-    println!("----------------------");
+    println!("{}", util::divider(60));
 
     for prefix in prefixes {
         let path_list = svn::path_list(creds, util::join_paths(base_url, prefix).as_str())?;
