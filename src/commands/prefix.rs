@@ -142,7 +142,8 @@ fn prefix_operations(options: &Options) -> Result<()> {
         let to_add: Vec<String> = options.add_branch
             .iter()
             .filter(|a| !prefixes.branch_prefixes.contains(a))
-            .map(|e| e.clone()).collect();
+            .cloned()
+            .collect();
         prefixes.branch_prefixes.extend(to_add);
 
         prefixes.branch_prefixes = prefixes.branch_prefixes
@@ -160,7 +161,8 @@ fn prefix_operations(options: &Options) -> Result<()> {
         let to_add: Vec<String> = options.add_tag
             .iter()
             .filter(|a| !prefixes.tag_prefixes.contains(a))
-            .map(|e| e.clone()).collect();
+            .cloned()
+            .collect();
         prefixes.tag_prefixes.extend(to_add);
 
         prefixes.tag_prefixes = prefixes.tag_prefixes

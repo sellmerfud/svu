@@ -350,7 +350,7 @@ fn mark_skipped_revisions(incoming_skipped: &HashSet<String>) -> Result<bool> {
     let mut new_skipped: Vec<String> =
         incoming_skipped
         .difference(&data.skipped)
-        .map(|r| r.clone())
+        .cloned()
         .collect();
 
     if new_skipped.is_empty() {
@@ -359,7 +359,7 @@ fn mark_skipped_revisions(incoming_skipped: &HashSet<String>) -> Result<bool> {
         let skipped: HashSet<String> =
             data.skipped
             .union(incoming_skipped)
-            .map(|r| r.clone())
+            .cloned()
             .collect();       
         data = BisectData { skipped, ..data };
         save_bisect_data(&data)?;
@@ -383,7 +383,7 @@ fn mark_unskipped_revisions(incoming_unskipped: &HashSet<String>) -> Result<bool
     let mut new_unskipped: Vec<String> =
         incoming_unskipped
         .intersection(&data.skipped)
-        .map(|r| r.clone())
+        .cloned()
         .collect();
 
     if new_unskipped.is_empty() {
@@ -392,7 +392,7 @@ fn mark_unskipped_revisions(incoming_unskipped: &HashSet<String>) -> Result<bool
         let skipped: HashSet<String> =
             data.skipped
             .difference(incoming_unskipped)
-            .map(|r| r.clone())
+            .cloned()
             .collect();       
         data = BisectData { skipped, ..data };
         save_bisect_data(&data)?;

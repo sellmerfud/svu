@@ -112,12 +112,16 @@ fn do_command<'a>(options: &Options) -> Result<()> {
             let added_unversioned: Vec<StashItem> = items
                 .iter()
                 .filter(|i| i.is_dir && (i.status == ADDED || i.status == UNVERSIONED))
-                .map(|i| i.clone())
+                .cloned()
                 .collect();
             let can_skip = |i: &StashItem| -> bool {
                 added_unversioned.iter().any(|p| i.path.starts_with(&p.path) && i.path != p.path)
             };
-            let revert_paths: Vec<String> = items.iter().filter(|i| !can_skip(i)).map(|i| i.path.clone()).collect();
+            let revert_paths: Vec<String> = items
+                .iter()
+                .filter(|i| !can_skip(i))
+                .map(|i| i.path.clone())
+                .collect();
             svn::revert(&revert_paths, "infinity", true, Some(&wc_root))?;
         }
 
