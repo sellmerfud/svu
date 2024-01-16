@@ -212,25 +212,6 @@ fn max_width(label: &str, value_widths: impl Iterator<Item = usize>) -> usize {
     value_widths.fold(label.len(), |m, v| m.max(v))
 }
 
-fn get_chunks(prefixes: &[String], num_cpus: usize) -> Vec<Vec<String>> {
-    let per_chunck  = prefixes.len() / num_cpus;
-    let extra       = prefixes.len() % num_cpus;
-    let mut chunks  = Vec::new();
-    let mut current = Vec::<String>::new();
-    let mut it      = prefixes.iter();
-
-    while let Some(prefix) = it.next() {
-        let plus_one = if chunks.len() + 1 <= extra { 1 } else { 0 };
-        let limit = per_chunck + plus_one;
-        if current.len() == limit {
-            chunks.push(current);
-            current = Vec::new();
-        }
-        current.push(prefix.to_string());
-    }
-    chunks.push(current);
-    chunks
-}
 // /this/is/the/users/path              
 // Location        Revision  Author  Date         Size
 // --------------  --------  ------  -----------  ----------
@@ -238,50 +219,19 @@ fn get_chunks(prefixes: &[String], num_cpus: usize) -> Vec<Vec<String>> {
 // branches/8.1        7645
 // tags/8.1.1-GA       7625
 fn show_path_result(creds: &Option<Credentials>, root_url: &str, path_entry: &SvnInfo, prefixes: &[String], sorted_prefixes: &[String]) -> Result<()> {
-    use std::{thread, io};
+    use rayon::prelude::*;
+
     struct Entry(String, Option<Box<SvnInfo>>);
 
-    fn process_prefixes(creds: Option<Credentials>, root_url: &str, rel_path: &str, prefixes: Vec<String>) -> io::Result<Vec<Entry>> {
-        let mut results = Vec::<Entry>::new();
-        for prefix in prefixes {
-            let path = join_paths(join_paths(root_url, prefix.as_str()), rel_path);
-            let info = svn::info(&creds, path.as_str(), Some("HEAD")).ok().map(|i| Box::new(i));
-            results.push(Entry(prefix, info));
-        }
-        Ok(results)
-    }
-
     let rel_path = &get_svn_rel_path(&path_entry.rel_url, sorted_prefixes)?;
-    let mut results = Vec::<Entry>::new();
-
-    let num_cpus = num_cpus::get();
-    if num_cpus > 1 {
-        let prefix_chunks = get_chunks(prefixes, num_cpus);
-        let mut threads = vec![];
-        for prefix_list in prefix_chunks {
-            let r = root_url.to_string();
-            let p = rel_path.clone();
-            let c = creds.clone();
-            threads.push(
-                thread::spawn(move || process_prefixes(c, &r,&p, prefix_list))
-            );
-        }
-    
-        for thread in threads {
-            for result in thread.join().unwrap()? {
-                results.push(result);
-            }
-        }
-    }
-    else {
-        for prefix in prefixes {
-            // let path = join_paths(join_paths(root_url, prefix), rel_path);
+    let results = prefixes.par_iter()
+        .map(|prefix| {
             let path = join_paths(join_paths(root_url, prefix.as_str()), rel_path.as_str());
             let info = svn::info(&creds, path.as_str(), Some("HEAD")).ok().map(|i| Box::new(i));
-            results.push(Entry(prefix.clone(), info));
-        }
-    }
-
+            Entry(prefix.clone(), info)
+        })
+        .collect::<Vec<Entry>>();
+        
     const LOCATION: &str = "Location";
     const REVISION: &str = "Revision";
     const AUTHOR: &str   = "Author";
