@@ -11,7 +11,7 @@ pub struct Credentials(pub String, pub String);   // username and password
 
 //  In order to support subversions repositories that require authentication
 //  we do the following in order:
-//  First, if the SVU_USERNAME and SVN_PASSWORD environment variables are set
+//  First, if the SVU_USERNAME and SVU_PASSWORD environment variables are set
 //  then we use those values for authentication.
 //  
 //  If that is not the case then we attempt to access the repository without

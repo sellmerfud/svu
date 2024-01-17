@@ -194,18 +194,10 @@ fn show_results(options: &Options) -> Result<()> {
 fn get_svn_rel_path<S>(rel_url: &str, sorted_prefixes: &[S]) -> Result<String>
     where S: AsRef<str> + Display,
 {
-    let prefix = sorted_prefixes.iter().find(|p| {
-        rel_url[2..].starts_with(p.as_ref()) // Skip the leading ^/
-    });
-    match prefix {
-        Some(prefix) =>
-            // Skip ^/<prefix>/
-            Ok(rel_url[prefix.as_ref().len() + 3..].to_string()),
-        None => {
-            let msg = format!("Cannot determine relative path for {}", rel_url);
-            Err(General(msg).into())
-        }
-    }
+    // Skip the leading ^/
+    sorted_prefixes.iter().find(|p| rel_url[2..].starts_with(p.as_ref()))
+        .map(|p| rel_url[p.as_ref().len() + 3..].to_string())
+        .ok_or(General(format!("Cannot determine relative path for {}", rel_url)).into())
 }
 
 fn max_width(label: &str, value_widths: impl Iterator<Item = usize>) -> usize {

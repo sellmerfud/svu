@@ -185,13 +185,12 @@ fn get_revision_number(creds: &Option<Credentials>, rev: &str, delta: i32, path:
     };
     let limit = Some(delta.abs() as u32 + 1);
     let entries = log(&creds, &[path], &[&rev_str], false, limit, false, false)?;
-    match entries.last() {
-        Some(log) => Ok(log.revision.to_owned()),
-        None      => {
-            let msg = format!("Revision cannot be resolved rev={}, delta={}, path={}", rev, delta, path);
-            Err(General(msg).into())
-        }
-    }
+    entries
+        .last()
+        .map(|log| log.revision.to_owned())
+        .ok_or(
+            General(format!("Revision cannot be resolved rev={}, delta={}, path={}", rev, delta, path)).into()
+        )
 }
 
 pub fn resolve_revision(creds: &Option<Credentials>, rev_string: &str, path: &str) -> Result<String> {
@@ -562,12 +561,8 @@ pub fn save_prefixes(prefixes: &Prefixes) -> Result<()> {
 //  Returns the info for the current directory or
 //  and Error if not withing a working copy.
 pub fn workingcopy_info() -> Result<SvnInfo> {
-    if let Ok(wc_info) = info(&None, ".", None) {
-        Ok(wc_info)
-    }
-    else {
-        Err(General("This command must be run in a serversion working copy directory.".to_string()).into())
-    }
+    info(&None, ".", None)
+        .map_err(|_| General("This command must be run in a serversion working copy directory.".to_string()).into())
 }
 
 fn parse_svn_status(text: &str) -> Result<SvnStatus> {

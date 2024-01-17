@@ -165,13 +165,8 @@ fn save_bisect_data(data: &BisectData) -> Result<()> {
 //  Load and return the bisect data or return a Generaal
 //  error if the data file is missing.
 fn get_bisect_data() -> Result<BisectData> {
-    match load_bisect_data()? {
-        Some(data) => Ok(data),
-        None => {
-            let msg = format!("You must first start a bisect session with the 'bisect start' subcommand.");
-            Err(General(msg).into())
-        }
-    }
+    load_bisect_data()?
+        .ok_or(General(format!("You must first start a bisect session with the 'bisect start' subcommand.")).into())
 }
 
 fn append_to_log<S>(msg: S) -> Result<()> 
