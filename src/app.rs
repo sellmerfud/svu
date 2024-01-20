@@ -20,9 +20,9 @@ impl <'a> App<'a> {
     fn build_app<'b>(subs: &'b Vec<&'b dyn SvCommand>) -> Command
     {
         let help = format!("For help about a particular command type '{} help COMMAND'", arg0());
-        let mut cmd = Command::new("svr")
+        let mut cmd = Command::new("svu")
             .version(VERSION)
-            .about("Subversion utilities")
+            .about(format!("Subversion utilities {}", VERSION))
             .after_help(help);
 
         //  Add clap subcommmands
