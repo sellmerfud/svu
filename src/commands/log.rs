@@ -13,7 +13,6 @@ use chrono::{DateTime, Local};
 #[derive(Debug, Parser)]
 #[command(
     author,
-    aliases = ["l1"],
     help_template = crate::app::HELP_TEMPLATE,
     after_help = "\
     By default shows only the first line of each commit message (see --full)\n\
