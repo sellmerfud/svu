@@ -1,34 +1,60 @@
 
 // use anyhow::Result;
-use clap::Command;
-use crate::commands::{sub_commands, SvCommand, arg0};
+use clap::Parser;
+use anyhow::Result;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+use crate::commands::*;
 
-pub struct App<'a> {
-    pub commands: Vec<&'a dyn SvCommand>,
-    pub clap: Command,
+pub(crate) const HELP_TEMPLATE: &str = "\
+{name}  v{version}
+
+{about}
+
+{usage-heading}
+{tab}{usage}
+
+{all-args}{after-help}";
+
+
+pub trait Run {
+    fn run(& mut self) -> Result<()>;
 }
 
-impl <'a> App<'a> {
-    pub fn new() -> Self {
-        let commands = sub_commands();
-        let clap = Self::build_app(&commands);
-        App { commands, clap }
-    }
+/// Subversion utilities
+#[derive(Debug, Parser)]
+#[command(
+    about,
+    author,
+    help_template = HELP_TEMPLATE,
+    propagate_version = true,
+    infer_subcommands = true,
+    version,
+)]
 
-    fn build_app<'b>(subs: &'b Vec<&'b dyn SvCommand>) -> Command
-    {
-        let help = format!("For help about a particular command type '{} help COMMAND'", arg0());
-        let mut cmd = Command::new("svu")
-            .version(VERSION)
-            .about(format!("Subversion utilities {}", VERSION))
-            .after_help(help);
+pub enum Commands {
+    Log(log::Log),
+    Branch(branch::Branch),
+    Show(show::Show),
+    Filerevs(filerevs::Filerevs),
+    Stash(stash::Stash),
+    Bisect(bisect::Bisect),
+    Prefix(prefix::Prefix),
+    Ignore(ignore::Ignore),
+}
 
-        //  Add clap subcommmands
-        for sub in subs {
-            cmd = cmd.subcommand(sub.clap_command());
+ use Commands::*;
+
+impl Run for Commands{
+    fn run(&mut self) -> Result<()> {
+        match self {
+            Log(cmd)      => cmd.run(),
+            Branch(cmd)   => cmd.run(),
+            Show(cmd)     => cmd.run(),
+            Filerevs(cmd) => cmd.run(),
+            Stash(cmd)    => cmd.run(),
+            Bisect(cmd)   => cmd.run(),
+            Prefix(cmd)   => cmd.run(),
+            Ignore(cmd)   => cmd.run(),
         }
-        cmd
     }
 }

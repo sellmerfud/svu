@@ -2,190 +2,134 @@
 
 use regex::Regex;
 use anyhow::Result;
-use clap::{Command, Arg, ArgMatches};
+use clap::Parser;
 use colored::*;
-use super::SvCommand;
 use crate::auth::Credentials;
 use crate::util::{SvError::*, join_paths, display_svn_datetime};
 use crate::svn::{self, Prefixes, SvnInfo};
 use chrono::Local;
 use std::fmt::Display;
-pub struct FileRevs;
 
-#[derive(Debug)]
-struct Options {
-    all_branches:   bool,
-    all_tags:       bool,
-    branch_regexes: Vec<Regex>,
-    tag_regexes:    Vec<Regex>,
-    paths:          Vec<String>,
-}
-
-impl Options {
-    fn build_options(matches: &ArgMatches) -> Options {
-
-        let branch_regexes = match matches.get_many::<Regex>("branches") {
-            Some(regexes) => regexes.map(|r| r.to_owned()).collect(),
-            None => vec![]
-        };
-
-        let tag_regexes = match matches.get_many::<Regex>("tags") {
-            Some(regexes) => regexes.map(|r| r.to_owned()).collect(),
-            None => vec![]
-        };
-
-        let paths = match matches.get_many::<String>("paths") {
-            Some(paths) => paths.map(|s| s.to_owned()).collect(),
-            None => vec![]
-        };
-
-        Options {
-            all_branches:   matches.get_flag("all-branches"),
-            all_tags:      matches.get_flag("all-tags"),
-            branch_regexes,
-            tag_regexes,
-            paths,
-        }
-    }
-}
-
-impl SvCommand for FileRevs {
-    fn name(&self) -> &'static str { "filerevs" }
-
-    fn clap_command(&self) -> Command {
-        Command::new(self.name())
-            .about("Display commit revisions of files across tags and branches")
-            .after_help("If no branches or tags are specified, then only the trunk\n\
-                         revision is displayed.\n\
-                         --branch and --tag may be specified multiple times.\n"
-            )
-            .arg(
-                Arg::new("branches")
-                    .short('b')
-                    .long("branches")
-                    .value_name("regex")
-                    .value_parser(Regex::new)
-                    .action(clap::ArgAction::Append)
-                    .help("Include branches that match <regex>")
-            )
-            .arg(
-                Arg::new("tags")
-                    .short('t')
-                    .long("tags")
-                    .value_name("regex")
-                    .value_parser(Regex::new)
-                    .action(clap::ArgAction::Append)
-                    .help("Include tags that match <regex>")
-            )
-            .arg(
-                Arg::new("all-branches")
-                    .short('B')
-                    .long("all-branches")
-                    .action(clap::ArgAction::SetTrue)
-                    .conflicts_with("branches")
-                    .help("Display all branches")
-            )
-            .arg(
-                Arg::new("all-tags")
-                    .short('T')
-                    .long("all-tags")
-                    .action(clap::ArgAction::SetTrue)
-                    .conflicts_with("tags")
-                    .help("Display all tags")
-            )
-            .arg(
-                Arg::new("paths")
-                .value_name("PATH")
-                .action(clap::ArgAction::Append)
-                .required(true)
-                .help("PATH or URL to target file")
-            )
-    }
+/// Display commit revisions of files across tags and branches
+#[derive(Debug, Parser)]
+#[command(
+    visible_aliases = ["revs"],
+    author,
+    help_template = crate::app::HELP_TEMPLATE,
+    after_help = "\
+    If no branches or tags are specified, then only the trunk\n\
+    revision is displayed.\n\
+    --branch and --tag may be specified multiple times.\n"
+)]    
+pub struct Filerevs {
+        /// Include branches that match <REGEX>
+        #[arg(short, long = "branch", value_name = "REGEX")]
+        branch_regexes: Vec<Regex>,
+    
+        /// Include tags that match <REGEX>
+        #[arg(short, long = "tag", value_name = "REGEX")]
+        tag_regexes: Vec<Regex>,
+    
+        /// Include all branches
+        #[arg(short = 'B', long, conflicts_with = "branch_regexes")]
+        all_branches: bool,
         
-    fn run(&self, matches: &ArgMatches) -> Result<()> {
-        show_results(&Options::build_options(matches))
-    }
+        /// Include all tags
+        #[arg(short = 'T', long, conflicts_with = "tag_regexes")]
+        all_tags: bool,
+        
+        /// PATH or URL to target file
+        #[arg(num_args = 1..)]
+        paths: Vec<String>,
+    
 }
 
-fn get_branches(creds: &Option<Credentials>, root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
-    let mut branches = Vec::<String>::new();
-    if all || !regexes.is_empty() {
-        let mut all_prefixes = prefixes.branch_prefixes.clone();
-        all_prefixes.extend(prefixes.tag_prefixes.clone());
-        let mut branch_prefixes = prefixes.branch_prefixes.clone();
-        branch_prefixes.sort();
-        let acceptable = |branch: &String| -> bool {
-            !all_prefixes.contains(branch) &&
-            (all || regexes.into_iter().any(|re| re.is_match(&branch)))
-        };
+impl Filerevs {
+    pub fn run(&mut self) -> Result<()> {
+        self.show_results()
+    }
 
-        for prefix in &branch_prefixes {
-            let path_list = svn::path_list(&creds, &join_paths(root_url, prefix))?;
-            for entry in &path_list.entries {
-                let branch = join_paths(prefix, &entry.name);
-                if acceptable(&branch) {
-                    branches.push(branch);
-                }
+    fn show_results(&self) -> Result<()> {
+        let creds = crate::auth::get_credentials()?;
+    
+            // First make sure all paths are rooted in the same repository
+        let path_list = svn::info_list(&creds, &self.paths, None::<String>)?;
+        let repo_uuid = &path_list[0].repo_uuid;
+        for item in &path_list[1..] {
+            if &item.repo_uuid != repo_uuid {
+                return Err(General("All paths must refer to the same repository.".to_string()).into());
             }
-        }        
-    }
-    Ok(branches.into_iter())
-}
-
-fn get_tags(creds: &Option<Credentials>, root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
-    let mut tags = Vec::<String>::new();
-    if all || !regexes.is_empty() {
-        let mut all_prefixes = prefixes.tag_prefixes.clone();
-        all_prefixes.extend(prefixes.tag_prefixes.clone());
-        let mut tag_prefixes = prefixes.tag_prefixes.clone();
-        tag_prefixes.sort();
-        let acceptable = |tag: &String| -> bool {
-            !all_prefixes.contains(tag) &&
-            (all || regexes.into_iter().any(|re| re.is_match(&tag)))
-        };
-
-        for prefix in &tag_prefixes {
-            let path_list = svn::path_list(&creds, &join_paths(root_url, prefix))?;
-            for entry in &path_list.entries {
-                let tag = join_paths(prefix, &entry.name);
-                if acceptable(&tag) {
-                    tags.push(tag);
-                }
-            }
-        }        
-    }
-    Ok(tags.into_iter())
-}
-
-fn show_results(options: &Options) -> Result<()> {
-    let creds = crate::auth::get_credentials()?;
-
-        // First make sure all paths are rooted in the same repository
-    let path_list = svn::info_list(&creds, &options.paths, None::<String>)?;
-    let repo_uuid = &path_list[0].repo_uuid;
-    for item in &path_list[1..] {
-        if &item.repo_uuid != repo_uuid {
-            return Err(General("All paths must refer to the same repository.".to_string()).into());
         }
+    
+        let root_url    = &path_list[0].root_url;
+        let prefix_info = svn::load_prefixes()?;
+        let branches    = self.get_branches(&creds, root_url, self.all_branches, &self.branch_regexes, &prefix_info)?;
+        let tags        = self.get_tags(&creds, root_url, self.all_tags, &self.tag_regexes, &prefix_info)?;
+    
+        let prefixes: Vec<String> = vec![prefix_info.trunk_prefix]
+            .into_iter()
+            .chain(branches.chain(tags))
+            .collect();
+        let mut sorted_prefixes = prefixes.clone();
+        sorted_prefixes.sort_by(|a, b| a.len().cmp(&b.len()).reverse());  // Sorteed by length longest first.
+    
+        for path_entry in &path_list {
+            show_path_result(&creds, root_url, path_entry, &prefixes, &sorted_prefixes)?;
+        }
+        Ok(())
     }
 
-    let root_url    = &path_list[0].root_url;
-    let prefix_info = svn::load_prefixes()?;
-    let branches    = get_branches(&creds, root_url, options.all_branches, &options.branch_regexes, &prefix_info)?;
-    let tags        = get_tags(&creds, root_url, options.all_tags, &options.tag_regexes, &prefix_info)?;
-
-    let prefixes: Vec<String> = vec![prefix_info.trunk_prefix]
-        .into_iter()
-        .chain(branches.chain(tags))
-        .collect();
-    let mut sorted_prefixes = prefixes.clone();
-    sorted_prefixes.sort_by(|a, b| a.len().cmp(&b.len()).reverse());  // Sorteed by length longest first.
-
-    for path_entry in &path_list {
-        show_path_result(&creds, root_url, path_entry, &prefixes, &sorted_prefixes)?;
+    fn get_branches(&self, creds: &Option<Credentials>, root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
+        let mut branches = Vec::<String>::new();
+        if all || !regexes.is_empty() {
+            let mut all_prefixes = prefixes.branch_prefixes.clone();
+            all_prefixes.extend(prefixes.tag_prefixes.clone());
+            let mut branch_prefixes = prefixes.branch_prefixes.clone();
+            branch_prefixes.sort();
+            let acceptable = |branch: &String| -> bool {
+                !all_prefixes.contains(branch) &&
+                (all || regexes.into_iter().any(|re| re.is_match(&branch)))
+            };
+    
+            for prefix in &branch_prefixes {
+                let path_list = svn::path_list(&creds, &join_paths(root_url, prefix))?;
+                for entry in &path_list.entries {
+                    let branch = join_paths(prefix, &entry.name);
+                    if acceptable(&branch) {
+                        branches.push(branch);
+                    }
+                }
+            }        
+        }
+        Ok(branches.into_iter())
     }
-    Ok(())
+    
+    fn get_tags(&self, creds: &Option<Credentials>, root_url: &str, all: bool, regexes: &[Regex], prefixes: &Prefixes) -> Result<impl Iterator<Item = String>> {
+        let mut tags = Vec::<String>::new();
+        if all || !regexes.is_empty() {
+            let mut all_prefixes = prefixes.tag_prefixes.clone();
+            all_prefixes.extend(prefixes.tag_prefixes.clone());
+            let mut tag_prefixes = prefixes.tag_prefixes.clone();
+            tag_prefixes.sort();
+            let acceptable = |tag: &String| -> bool {
+                !all_prefixes.contains(tag) &&
+                (all || regexes.into_iter().any(|re| re.is_match(&tag)))
+            };
+    
+            for prefix in &tag_prefixes {
+                let path_list = svn::path_list(&creds, &join_paths(root_url, prefix))?;
+                for entry in &path_list.entries {
+                    let tag = join_paths(prefix, &entry.name);
+                    if acceptable(&tag) {
+                        tags.push(tag);
+                    }
+                }
+            }        
+        }
+        Ok(tags.into_iter())
+    }
 }
+
 
 //  We must determine the path to the file relative
 //  to its subversion prefix.
@@ -284,4 +228,10 @@ fn show_path_result(creds: &Option<Credentials>, root_url: &str, path_entry: &Sv
         }
     }
     Ok(())
-}
+    }
+
+
+
+
+
+

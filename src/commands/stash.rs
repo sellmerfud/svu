@@ -1,9 +1,8 @@
 use anyhow::Result;
 use chrono::{DateTime, Local};
-use clap::{Command, ArgMatches};
+use clap::{Parser, Subcommand};
 use colored::Colorize;
 use crate::util::SvError::*;
-use super::SvCommand;
 use std::borrow::Cow;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
@@ -16,12 +15,6 @@ use regex::Regex;
 use pathdiff::diff_paths;
 use std::env::current_dir;
 
-pub trait StashCommand {
-    fn name(&self) -> &'static str;
-    fn clap_command(&self) -> clap::Command;
-    fn run(&self, matches: &ArgMatches) -> anyhow::Result<()>;
-}
-
 mod push;
 mod pop;
 mod apply;
@@ -30,59 +23,58 @@ mod list;
 mod show;
 mod clear;
 
-/// Return a vector of all of the stash subcommands.
-pub fn stash_commands<'a>() -> Vec<&'a dyn StashCommand> {
-    vec![
-        &push::Push,
-        &pop::Pop,
-        &apply::Apply,
-        &drop::Drop,
-        &list::List,
-        &show::Show,
-        &clear::Clear,
-    ]
+use push::PushArgs;
+
+/// Stash away changes to a dirty working copy
+#[derive(Debug, Parser)]
+#[command(
+    author,
+    help_template = crate::app::HELP_TEMPLATE,
+    after_help = "\
+    Save local changes to your working copy so that you can work\n\
+    on something else and then merge the stashed changes back into\n\
+    your working copy at a later time.\n\n\
+    You can omit the COMMAND to quickly run the 'push' command."
+)]
+#[command(args_conflicts_with_subcommands = true)]
+#[command(flatten_help = false)]
+pub struct Stash {
+    #[command(subcommand)]
+    command: Option<StashCommands>,
+
+    #[command(flatten)]
+    push_args: PushArgs,
 }
 
+#[derive(Debug, Subcommand)]
+enum StashCommands {
+    Push(PushArgs),
+    Pop(pop::Pop),
+    Apply(apply::Apply),
+    Drop(drop::Drop),
+    List(list::List),
+    Show(show::Show),
+    Clear(clear::Clear),
+}
+use StashCommands::*;
 
-pub struct Stash;
+impl Stash {
 
-impl SvCommand for Stash {
-    fn name(&self) -> &'static str { "stash" }
-
-    fn clap_command(&self) -> Command {
-        let mut cmd = Command::new(self.name())
-            .about("Stash away changes to a dirty working copy")
-            .flatten_help(true)
-            .before_help("Save local changes to your working copy so that you can work\n\
-                          on something else and then merge the stashed changes back into\n\
-                          your working copy at a later time.\n\n\
-                          You can omit the COMMAND to quickly run the 'push' command.")
-            .args(push::Push::push_args());
-
-        //  Add clap subcommmands
-        for sub in stash_commands() {
-            cmd = cmd.subcommand(sub.clap_command());
+    pub fn run(&mut self) -> Result<()> {
+        match &mut self.command {
+            None             => push::Push::new(&self.push_args).run(),
+            Some(Push(args)) => push::Push::new(&args).run(),
+            Some(Pop(cmd))   => cmd.run(),
+            Some(Apply(cmd)) => cmd.run(),
+            Some(Drop(cmd))  => cmd.run(),
+            Some(List(cmd))  => cmd.run(),
+            Some(Show(cmd))  => cmd.run(),
+            Some(Clear(cmd)) => cmd.run(),
         }
-        cmd
-             
-    }
-        
-    fn run(&self, matches: &ArgMatches) -> Result<()> {
-        match matches.subcommand() {
-            Some((name, sub_matches)) => {
-                if let Some(command) = stash_commands().iter().find(|cmd| cmd.name() == name) {
-                    command.run(sub_matches)
-                } else {
-                    Err(General(format!("Fatal: stash command '{}' not found!", name)).into())
-                }
-            }
-            None => {
-                //  If no command given, use push command by default
-                push::Push.run(matches)
-            }
-        }    
     }
 }
+
+
 
 fn parse_stash_id(arg: &str) -> Result<usize> {
     let re = Regex::new(r"^(?:stash-)?(\d+)$")?;

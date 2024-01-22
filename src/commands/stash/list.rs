@@ -1,20 +1,19 @@
 
-use clap::{Command, ArgMatches};
+use clap::Parser;
 use super::*;
 use anyhow::Result;
 use crate::svn;
 
+/// Display stash entries
+#[derive(Debug, Parser)]
+#[command(
+    author,
+    help_template = crate::app::HELP_TEMPLATE,
+)]    
 pub struct List;
-
-impl StashCommand for List {
-    fn name(&self) -> &'static str { "list" }
-
-    fn clap_command(&self) -> Command {
-        Command::new(self.name())
-            .about("Display stash entries")
-    }
-        
-    fn run(&self, _matches: &ArgMatches) -> Result<()> {
+    
+impl List {
+    pub fn run(&mut self) -> Result<()> {
         svn::workingcopy_info()?;  // Make sure we are in a working copy.
 
         for (index, stash) in load_stash_entries()?.iter().enumerate() {

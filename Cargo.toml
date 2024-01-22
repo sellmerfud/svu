@@ -9,7 +9,7 @@ edition = "2021"
 regex      = "1"
 anyhow     = "1.0"
 thiserror  = "1"
-clap       = { version = "4.4.11", features = ["cargo"] }
+clap = { version = "4.3.0", features = ["derive"] }
 chrono     = "0.4"
 roxmltree  = "0.19"
 colored    = "2.1"

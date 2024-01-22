@@ -1,10 +1,9 @@
 use anyhow::Result;
 use chrono::Local;
-use clap::{Command, ArgMatches};
+use clap::{Parser, Subcommand};
 use colored::Colorize;
 use crate::auth::Credentials;
 use crate::util::{SvError::*, show_commit};
-use super::SvCommand;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::fs::File;
@@ -17,12 +16,6 @@ use std::env::current_dir;
 use std::collections::HashSet;
 use std::fmt::Display;
 
-pub trait BisectCommand {
-    fn name(&self) -> &'static str;
-    fn clap_command(&self) -> clap::Command;
-    fn run(&self, matches: &ArgMatches) -> anyhow::Result<()>;
-}
-
 mod start;
 mod good;
 mod bad;
@@ -34,63 +27,60 @@ mod run;
 mod replay;
 mod reset;
 
-/// Return a vector of all of the bisect subcommands.
-pub fn bisect_commands<'a>() -> Vec<&'a dyn BisectCommand> {
-    vec![
-        &start::Start,
-        &bad::Bad,
-        &good::Good,
-        &terms::Terms,
-        &skip::Skip,
-        &unskip::Unskip,
-        &log::Log,
-        &run::Run,
-        &replay::Replay,
-        &reset::Reset,
-    ]
+/// Use binary search to find the commit that introduced a bug
+#[derive(Debug, Parser)]
+#[command(
+    author,
+    help_template = crate::app::HELP_TEMPLATE,
+)]
+#[command(args_conflicts_with_subcommands = true)]
+#[command(flatten_help = false)]
+pub struct Bisect {
+    #[command(subcommand)]
+    command: BisectCommands,
 }
 
+#[derive(Debug, Subcommand)]
+enum BisectCommands {
+    Start(start::Start),
+    Bad(bad::Bad),
+    Good(good::Good),
+    Terms(terms::Terms),
+    Skip(skip::Skip),
+    Unskip(unskip::Unskip),
+    Log(log::Log),
+    Run(run::Run),
+    Replay(replay::Replay),
+    Reset(reset::Reset),
+}
+use BisectCommands::*;
 
-pub struct Bisect;
+impl Bisect {
 
-impl SvCommand for Bisect {
-    fn name(&self) -> &'static str { "bisect" }
-
-    fn clap_command(&self) -> Command {
-        let mut cmd = Command::new(self.name())
-            .about("Use binary search to find the commit that introduced a bug")
-            .flatten_help(true);
-
-        //  Add clap subcommmands
-        for sub in bisect_commands() {
-            cmd = cmd.subcommand(sub.clap_command());
-        }
-        cmd
-             
-    }
-        
-    fn run(&self, matches: &ArgMatches) -> Result<()> {
-        if let Some((name, sub_matches)) = matches.subcommand() {
-            if let Some(command) = bisect_commands().iter().find(|cmd| cmd.name() == name) {
-                command.run(sub_matches)
-            } else {
-                Err(General(format!("Fatal: bisect command '{}' not found!", name)).into())
-            }
-        } else {
-            //  If user does not supply a command name
-            //  then show the help message
-            //  (Need a new mutable clap ref)
-            Ok(Bisect.clap_command().print_help()?)
+    pub fn run(&mut self) -> Result<()> {
+        match &mut self.command {
+            Start(cmd)  => cmd.run(),
+            Bad(cmd)    => cmd.run(),
+            Good(cmd)   => cmd.run(),
+            Terms(cmd)  => cmd.run(),
+            Skip(cmd)   => cmd.run(),
+            Unskip(cmd) => cmd.run(),
+            Log(cmd)    => cmd.run(),
+            Run(cmd)    => cmd.run(),
+            Replay(cmd) => cmd.run(),
+            Reset(cmd)  => cmd.run(),
         }
     }
 }
+
 
 fn parse_term(arg: &str) -> Result<String> {
+    let commands = HashSet::from([ "start", "bad", "good", "terms", "skip", "unskip", "log", "run", "replay", "reset" ]);
     let re = Regex::new(r"^[A-Za-z][-_A-Za-z]*$").unwrap();
     if !re.is_match(arg)  {
         Err(General("Term must start with a letter and contain only letters, '-', or '_'".to_string()).into())
     }
-    else if bisect_commands().iter().any(|c| c.name() == arg) {
+    else if commands.contains(arg) {
         Err(General("Term cannot mask another bisect command".to_string()).into())
     }
     else {
@@ -125,12 +115,12 @@ struct BisectData {
 impl BisectData {
     fn good_name<'a>(&'a self) -> &'a str {
         // bad::Bad.name()
-        self.term_good.as_ref().map(|s| s.as_ref()).unwrap_or(good::Good.name())
+        self.term_good.as_ref().map(|s| s.as_ref()).unwrap_or("good")
     }
 
     fn bad_name<'a>(&'a self) -> &'a str {
         // bad::Bad.name()
-        self.term_bad.as_ref().map(|s| s.as_ref()).unwrap_or(bad::Bad.name())
+        self.term_bad.as_ref().map(|s| s.as_ref()).unwrap_or("bad")
     }
 
     fn is_ready(&self) -> bool { self.max_rev.is_some() && self.min_rev.is_some() }

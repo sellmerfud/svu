@@ -423,7 +423,7 @@ pub fn log<S>(
     args.extend_from_slice(&["log".to_string(), "--xml".to_string()]);
     push_creds(&mut args, creds);
     if !include_msg  { args.push("--quiet".to_string()) }
-    if stop_on_copy  { args.push("--stop-on_copy".to_string()) }
+    if stop_on_copy  { args.push("--stop-on-copy".to_string()) }
     if include_paths { args.push("--verbose".to_string()) }
     args.extend(limit.into_iter().map(|l| format!("--limit={}", l)));
     args.extend(revisions.into_iter().map(|r| format!("--revision={}", r)));

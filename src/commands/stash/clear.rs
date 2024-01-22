@@ -1,23 +1,20 @@
 
-use clap::{Command, ArgMatches};
-use super::StashCommand;
+use clap::Parser;
 use anyhow::Result;
 use crate::svn;
 use super::*;
 use std::fs::remove_file;
 
+/// Remove all stash entries
+#[derive(Debug, Parser)]
+#[command(
+    author,
+    help_template = crate::app::HELP_TEMPLATE,
+)]    
 pub struct Clear;
 
-impl StashCommand for Clear {
-    fn name(&self) -> &'static str { "clear" }
-
-    fn clap_command(&self) -> Command {
-        Command::new(self.name())
-            .about("Remove all stash entries")
-    }
-        
-    fn run(&self, _matches: &ArgMatches) -> Result<()> {
-
+impl Clear {
+    pub fn run(&mut self) -> Result<()> {
         svn::workingcopy_info()?;  // Make sure we are in a working copy.
         let stash_entries_path = stash_entries_file()?;
         let stash_entries      = load_stash_entries()?; 
@@ -40,4 +37,3 @@ impl StashCommand for Clear {
         Ok(())
     }
 }
-
