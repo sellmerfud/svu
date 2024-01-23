@@ -75,7 +75,9 @@ impl Bisect {
 
 
 fn parse_term(arg: &str) -> Result<String> {
-    let commands = HashSet::from([ "start", "bad", "good", "terms", "skip", "unskip", "log", "run", "replay", "reset" ]);
+    let commands = HashSet::from(
+        [ "start", "bad", "good", "terms", "skip", "unskip", "log", "run", "replay", "reset" ]
+    );
     let re = Regex::new(r"^[A-Za-z][-_A-Za-z]*$").unwrap();
     if !re.is_match(arg)  {
         Err(General("Term must start with a letter and contain only letters, '-', or '_'".to_string()).into())
@@ -115,15 +117,21 @@ struct BisectData {
 impl BisectData {
     fn good_name<'a>(&'a self) -> &'a str {
         // bad::Bad.name()
-        self.term_good.as_ref().map(|s| s.as_ref()).unwrap_or("good")
+        self.term_good.as_ref()
+            .map(|s| s.as_ref())
+            .unwrap_or("good")
     }
 
     fn bad_name<'a>(&'a self) -> &'a str {
         // bad::Bad.name()
-        self.term_bad.as_ref().map(|s| s.as_ref()).unwrap_or("bad")
+        self.term_bad.as_ref()
+            .map(|s| s.as_ref())
+            .unwrap_or("bad")
     }
 
-    fn is_ready(&self) -> bool { self.max_rev.is_some() && self.min_rev.is_some() }
+    fn is_ready(&self) -> bool {
+        self.max_rev.is_some() && self.min_rev.is_some()
+    }
 }
 
 
@@ -207,9 +215,16 @@ fn to_rev_num(rev: &str) -> usize {
 
 fn get_workingcopy_bounds() -> Result<(String, String)> {
     let first = svn::log(&None, &[], &["HEAD:0"], true, Some(1), false,false)?
-        .first().unwrap().revision.clone();
+        .first()
+        .unwrap()
+        .revision
+        .clone();
     let last = svn::log(&None, &[], &["0:HEAD"], true, Some(1), false,false)?
-        .first().unwrap().revision.clone();
+        .first()
+        .unwrap()
+        .revision
+        .clone();
+    
     Ok((first.clone(), last.clone()))
 }
 
