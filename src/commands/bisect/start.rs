@@ -64,6 +64,10 @@ impl Start {
                     _ => ()
                 }
     
+                if self.term_good.is_some() && self.term_good == self.term_bad {
+                    return Err(General("The 'good' and 'bad' terms cannot be the same.".to_string()).into())
+                }
+
                 let (head_rev, first_rev) = get_workingcopy_bounds()?;
                 let data = BisectData {
                     local_path:   current_dir()?.to_string_lossy().to_string(),
