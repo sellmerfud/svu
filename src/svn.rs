@@ -156,7 +156,7 @@ impl SvnCmd {
         S: AsRef<str> + Display
     {
         if cond {
-            self.args.push(arg.as_ref().to_string());
+            self.arg(arg);
         }
         self
     }
@@ -166,7 +166,7 @@ impl SvnCmd {
         S: AsRef<str> + Display
     {
         if let Some(arg) = arg {
-            self.args.push(arg.as_ref().to_string());
+            self.arg(arg);
         }
         self
     }
