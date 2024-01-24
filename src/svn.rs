@@ -1,6 +1,5 @@
 
 use std::env;
-use std::ffi::OsStr;
 use std::io::Write;
 use std::sync::OnceLock;
 use std::process::{Command, Output};
@@ -15,7 +14,6 @@ use crate::util::{parse_svn_date_opt, null_date, data_directory};
 use regex::Regex;
 use std::fmt::Display;
 use serde::{Deserialize, Serialize};
-use crate::auth::push_creds;
 //  Get the name of the svn command to run
 //  Use "svn" (on the path as the default)
 fn svn_cmd() -> &'static String {
@@ -107,17 +105,98 @@ pub struct SvnStatus {
     pub entries: Vec<StatusEntry>,
 }
 
-pub fn run_svn<S>(args: &[S], cwd: Option<&Path>) -> Result<Output> 
-    where S: AsRef<OsStr> + Display
-{
-    let mut cmd = Command::new(svn_cmd());
-    if let Some(dir) = cwd {
-        cmd.current_dir(dir);
-    }
-    Ok(cmd.args(args).output()?)
+// Object used to simplify running svn commands
+#[derive(Debug, Clone)]
+pub struct SvnCmd {
+    cwd: Option<PathBuf>,
+    name: String,
+    args: Vec<String>,
+
 }
 
-pub const USE_CWD: Option<&Path> = None;
+impl SvnCmd {
+    pub fn new<S>(name: S) -> Self
+    where
+        S: AsRef<str> + Display
+     {
+        SvnCmd {
+            cwd: None,
+            name: name.as_ref().to_string(),
+            args: vec![],
+        }
+    }
+
+    pub fn with_cwd(&mut self, cwd: Option<&Path>) -> &mut Self
+    {
+        if let Some(cwd) = cwd {
+            self.cwd = Some(PathBuf::from(cwd));
+        }
+        self
+    }
+
+    
+    pub fn with_creds(&mut self, creds: &Option<Credentials>) -> &mut Self {
+        if let Some(Credentials(username, password)) = creds {
+            self.arg(format!("--username={}", username));
+            self.arg(format!("--password={}", password));
+        }
+        self
+    }
+
+    pub fn arg<S>(&mut self, arg: S) -> &mut Self
+    where
+        S: AsRef<str> + Display
+    {
+        self.args.push(arg.as_ref().to_string());
+        self
+    }
+
+    pub fn arg_if<S>(&mut self, cond: bool, arg: S) -> &mut Self
+    where
+        S: AsRef<str> + Display
+    {
+        if cond {
+            self.args.push(arg.as_ref().to_string());
+        }
+        self
+    }
+
+    pub fn opt_arg<S>(&mut self, arg: &Option<S>) -> &mut Self
+    where
+        S: AsRef<str> + Display
+    {
+        if let Some(arg) = arg {
+            self.args.push(arg.as_ref().to_string());
+        }
+        self
+    }
+
+    pub fn args<I, S>(&mut self, args: I) -> &mut Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str> + Display
+    {
+        let args = args
+            .into_iter()
+            .map(|a| a.as_ref().to_string());
+        self.args.extend(args);
+        self
+    }
+
+    pub fn run(&mut self) -> Result<Output>  {
+        let mut cmd = Command::new(svn_cmd());
+        if let Some(dir) = &self.cwd {
+            cmd.current_dir(dir);
+        }
+        cmd.arg(&self.name);
+        cmd.args(&self.args);
+
+        Ok(cmd.output()?)
+    }
+}
+
+
+// Functions for accessing data in XML nodes
 
 fn get_attr(n: &Node, name: &str) -> String { 
     n.attribute(name).unwrap_or("").to_owned()
@@ -150,7 +229,8 @@ fn get_child_text_or(parent: &Node, name: &str, default: &str) -> String {
 }
 
 
-
+//  Regular expression for validating svn REVISION arguments
+//  We allow revisions such as HEAD-1
 fn rev_re() -> &'static Regex {
     static REV: OnceLock<Regex> = OnceLock::new();
     REV.get_or_init(|| {
@@ -163,6 +243,8 @@ pub fn looks_like_revision(text: &str) -> bool {
     rev_re().is_match(text)
 }
 
+//  Regular expression for validating REVISION ranges
+//  such as HEAD:HEAD-5
 fn rev_range_re() -> &'static Regex {
     static REV: OnceLock<Regex> = OnceLock::new();
     REV.get_or_init(|| {
@@ -177,6 +259,9 @@ pub fn looks_like_revision_range(text: &str) -> bool {
 
 //  Use svn log to verify that the revision string refers to a
 //  valid revision.
+//  For revisions such as HEAD it will return the actual numeric revision.
+//  For revisions that do not exist for the given path, it will return the next
+//  available revision if possible.
 fn get_revision_number(creds: &Option<Credentials>, rev: &str, delta: i32, path: &str) -> Result<String> {
     let rev_str = match delta {
         0          =>  rev.to_string(),
@@ -234,7 +319,7 @@ pub fn resolve_revision_range(creds: &Option<Credentials>, rev_string: &str, pat
     }
 }
 
-
+//  Return the path to the working copy root directory.
 pub fn workingcopy_root(working_dir: &Path) -> Option<PathBuf> {
 
     fn find_it(path: &Path) -> Option<&Path> {
@@ -320,14 +405,13 @@ fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
 
 pub fn info<'a>(creds: &Option<Credentials>, path: &'a str, revision: Option<&'a str>) -> Result<SvnInfo> {
 
-    let mut args = Vec::new();
-    args.extend_from_slice(&["info".to_string(), "--xml".to_string()]);
-    push_creds(&mut args, creds);
-    if let Some(rev) = revision {
-        args.push(format!("--revision={}", rev));
-    }
-    args.push(path.to_string());
-    let output = run_svn(&args, USE_CWD)?;
+    let output = SvnCmd::new("info")
+        .with_creds(creds)
+        .arg("--xml")
+        .opt_arg(&revision.map(|r| format!("--revision={}", r)))
+        .arg(path)
+        .run()?;
+
     if output.status.success() {
         let text = String::from_utf8_lossy(&output.stdout);
         let info = parse_svn_info(&text)?;
@@ -339,25 +423,23 @@ pub fn info<'a>(creds: &Option<Credentials>, path: &'a str, revision: Option<&'a
 }
 
 pub fn info_list<S>(creds: &Option<Credentials>, paths: &[S], revision: Option<S>) -> Result<Vec<SvnInfo>> 
-    where S: AsRef<str> + Display {
+where
+    S: AsRef<str> + Display
+{
+    let output = SvnCmd::new("info")
+    .with_creds(creds)
+    .arg("--xml")
+    .opt_arg(&revision.map(|r| format!("--revision={}", r)))
+    .args(paths)
+    .run()?;
 
-        let mut args: Vec<String> = Vec::new();
-        args.extend_from_slice(&["info".to_string(), "--xml".to_string()]);
-        push_creds(&mut args, creds);
-        let rev_arg: String;
-        if let Some(rev) = revision {
-            rev_arg = format!("--revision={}", rev);
-            args.push(rev_arg);
-        }
-        args.extend(paths.iter().map(|s| s.to_string()).collect::<Vec<String>>());
-        let output = run_svn(&args, USE_CWD)?;
-        if output.status.success() {
-            let text = String::from_utf8_lossy(&output.stdout);
-            parse_svn_info(&text)
-        }
-        else {
-            Err(SvnError(output).into())
-        }
+    if output.status.success() {
+        let text = String::from_utf8_lossy(&output.stdout);
+        parse_svn_info(&text)
+    }
+    else {
+        Err(SvnError(output).into())
+    }
 }
 
 fn get_log_entry_paths(log_entry: &Node) -> Vec<LogPath> {
@@ -416,19 +498,20 @@ pub fn log<S>(
     limit: Option<u32>,
     stop_on_copy: bool,
     include_paths: bool) -> Result<Vec<LogEntry>>
-        where S: AsRef<str> + Display
-    {
+where
+    S: AsRef<str> + Display
+{
+    let output = SvnCmd::new("log")
+        .with_creds(creds)
+        .arg("--xml")
+        .arg_if(!include_msg, "--quiet")
+        .arg_if(stop_on_copy, "--stop-on-copy")
+        .arg_if(include_paths, "--verbose")
+        .opt_arg(&limit.map(|l| format!("--limit={}", l)))
+        .args(revisions.iter().map(|r| format!("--revision={}", r)))
+        .args(paths)
+        .run()?;
 
-    let mut args = Vec::new();
-    args.extend_from_slice(&["log".to_string(), "--xml".to_string()]);
-    push_creds(&mut args, creds);
-    if !include_msg  { args.push("--quiet".to_string()) }
-    if stop_on_copy  { args.push("--stop-on-copy".to_string()) }
-    if include_paths { args.push("--verbose".to_string()) }
-    args.extend(limit.into_iter().map(|l| format!("--limit={}", l)));
-    args.extend(revisions.into_iter().map(|r| format!("--revision={}", r)));
-    args.extend(paths.into_iter().map(|p| p.to_string()));
-    let output = run_svn(&args, USE_CWD)?;
     if output.status.success() {
         let text = String::from_utf8_lossy(&output.stdout);
         parse_svn_log(&text)
@@ -437,7 +520,6 @@ pub fn log<S>(
         Err(SvnError(output).into())
     }
 }
-
 
 fn parse_svn_list(text: &str) -> Result<Vec<SvnList>> {
     let mut path_lists = vec![];
@@ -481,10 +563,13 @@ pub fn path_lists<S>(creds: &Option<Credentials>, paths: &[S]) -> Result<Vec<Svn
         Ok(vec![])
     }
     else {
-        let mut args = vec!["list".to_owned(), "--xml".to_owned()];
-        push_creds(&mut args, creds);
-        args.extend(paths.into_iter().map(|p| p.to_string()));
-        let output = run_svn(&args, USE_CWD)?;
+
+        let output = SvnCmd::new("list")
+            .with_creds(creds)
+            .arg("--xml")
+            .args(paths)
+            .run()?;
+
         if output.status.success() {
             let text = String::from_utf8_lossy(&output.stdout);
             parse_svn_list(&text)
@@ -497,19 +582,19 @@ pub fn path_lists<S>(creds: &Option<Credentials>, paths: &[S]) -> Result<Vec<Svn
 
 //  Get svn list for a single path.
 pub fn path_list(creds: &Option<Credentials>, path: &str) -> Result<SvnList> {
-    let mut xx = path_lists(creds, &[path.to_owned()])?;
-    Ok(xx.remove(0))
+    let mut list = path_lists(creds, &[path.to_owned()])?;
+    Ok(list.remove(0))
 }
 
-pub fn change_diff(path: &str, commit_rev: &str) -> Result<Vec<String>> {
-    let args = vec![
-        "diff".to_string(),
-        "--change".to_string(),
-        commit_rev.to_string(),
-        path.to_string()
-    ];
+pub fn change_diff(creds: &Option<Credentials>, path: &str, commit_rev: &str) -> Result<Vec<String>> {
 
-    let output = run_svn(&args, USE_CWD)?;
+    let output = SvnCmd::new("diff")
+        .with_creds(creds)
+        .arg("--change")
+        .arg(commit_rev)
+        .arg(path)
+        .run()?;
+
     if output.status.success() {
         let text = String::from_utf8_lossy(&output.stdout);
         Ok(text.split("\n").map(|l| l.to_string()).collect())
@@ -589,13 +674,15 @@ fn parse_svn_status(text: &str) -> Result<SvnStatus> {
 }
 
 pub fn status<S>(path: S, cwd: Option<&Path>) -> Result<SvnStatus>
-    where S: AsRef<str> + Display
+where
+    S: AsRef<str> + Display
 {
-    let mut args = Vec::new();
-    args.extend_from_slice(&["status".to_string(), "--xml".to_string()]);
-    args.push(path.to_string());
+    let output = SvnCmd::new("status")
+        .with_cwd(cwd)
+        .arg("--xml")
+        .arg(path)
+        .run()?;
 
-    let output = run_svn(&args, cwd)?;
     if output.status.success() {
         let text = String::from_utf8_lossy(&output.stdout);
         Ok(parse_svn_status(&text)?)
@@ -603,23 +690,20 @@ pub fn status<S>(path: S, cwd: Option<&Path>) -> Result<SvnStatus>
     else {
         Err(SvnError(output).into())
     }
-
 }
 
 pub fn add<S, T>(paths: &[S], depth: T, auto_props: bool, cwd: Option<&Path>) -> Result<()>
-    where S: AsRef<str> + Display,
-          T: AsRef<str> + Display
+where
+    S: AsRef<str> + Display,
+    T: AsRef<str> + Display
 {
-    let depth_arg = format!("--depth={}", depth);
-    let props_arg = if auto_props { "--auto-props" } else {"--no-auto-props"};
-    let mut args = Vec::new();
-    args.push("add");
-    args.push(depth_arg.as_str());
-    args.push(props_arg);
-    for path in paths {
-        args.push(path.as_ref());
-    }
-    let output = run_svn(&args, cwd)?;
+    let output = SvnCmd::new("add")
+        .with_cwd(cwd)
+        .arg(format!("--depth={}", depth))
+        .arg(if auto_props { "--auto-props" } else {"--no-auto-props"})
+        .args(paths)
+        .run()?;
+
     if output.status.success() {
         Ok(())
     }
@@ -629,20 +713,17 @@ pub fn add<S, T>(paths: &[S], depth: T, auto_props: bool, cwd: Option<&Path>) ->
 }
 
 pub fn revert<S, T>(paths: &[S], depth: T, remove_added: bool, cwd: Option<&Path>) -> Result<()>
-    where S: AsRef<str> + Display,
-          T: AsRef<str> + Display
-    {
-    let depth_arg = format!("--depth={}", depth);
-    let mut args = Vec::new();
-    args.push("revert");
-    args.push(depth_arg.as_str());
-    if remove_added {
-        args.push("--remove-added");
-    }
-    for path in paths {
-        args.push(path.as_ref());
-    }
-    let output = run_svn(&args, cwd)?;
+where
+    S: AsRef<str> + Display,
+    T: AsRef<str> + Display
+{
+    let output = SvnCmd::new("revert")
+        .with_cwd(cwd)
+        .arg(format!("--depth={}", depth))
+        .arg_if(remove_added, "--remove-added")
+        .args(paths)
+        .run()?;
+
     if output.status.success() {
         Ok(())
     }
@@ -652,12 +733,13 @@ pub fn revert<S, T>(paths: &[S], depth: T, remove_added: bool, cwd: Option<&Path
 }
 
 pub fn create_patch(patch_file: &Path, cwd: &Path) -> Result<()> {
-    let mut args = Vec::new();
-    args.push("diff".to_string());
-    args.push("--depth=infinity".to_string());
-    args.push("--ignore-properties".to_string());
-    args.push(".".to_string());
-    let output = run_svn(&args, Some(cwd))?;
+    let output = SvnCmd::new("diff")
+        .with_cwd(Some(cwd))
+        .arg("--depth=infinity")
+        .arg("--ignore-properties")
+        .arg(".")
+        .run()?;
+
     if output.status.success() {
         let mut writer = File::create(patch_file)?;
         writer.write_all(&output.stdout)?;
@@ -670,14 +752,12 @@ pub fn create_patch(patch_file: &Path, cwd: &Path) -> Result<()> {
 
 
 pub fn apply_patch(patch_file: &Path, dry_run: bool, cwd: Option<&Path>) -> Result<Vec<u8>> {
-    let mut args = Vec::new();
-    args.push("patch".to_string());
-    if dry_run {
-        args.push("--dry-run".to_string());
-    }
-    args.push(patch_file.to_string_lossy().to_string());
+    let output = SvnCmd::new("patch")
+        .with_cwd(cwd)
+        .arg_if(dry_run, "--dry-run")
+        .arg(patch_file.to_string_lossy())
+        .run()?;
 
-    let output = run_svn(&args, cwd)?;
     if output.status.success() {
         Ok(output.stdout)
     }
@@ -687,13 +767,12 @@ pub fn apply_patch(patch_file: &Path, dry_run: bool, cwd: Option<&Path>) -> Resu
 }
 
 pub fn update(revision: &str, depth: &str, cwd: Option<&Path>) -> Result<Vec<u8>> {
-    let mut args = Vec::new();
-    let depth_arg = format!("--depth={}", depth);
-    let rev_arg   = format!("--revision={}", revision);
-    args.push("update".to_string());
-    args.push(depth_arg);
-    args.push(rev_arg);
-    let output = run_svn(&args, cwd)?;
+    let output = SvnCmd::new("update")
+        .with_cwd(cwd)
+        .arg(format!("--depth={}", depth))
+        .arg(format!("--revision={}", revision))
+        .run()?;
+
     if output.status.success() {
         Ok(output.stdout)
     }

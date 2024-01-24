@@ -1,7 +1,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use crate::auth::{Credentials, push_creds};
+use crate::auth::Credentials;
 use crate::svn;
 use crate::util;
 use crate::util::SvError::*;
@@ -93,14 +93,13 @@ fn is_working_directory(creds: &Option<Credentials>, path: &str) -> Result<bool>
 }
 
 fn get_ignores(creds: &Option<Credentials>, path: &str, global: bool) -> Result<Option<String>> {
-    let prop = (if global { "svn:global-ignores" } else { "svn:ignore" }).to_owned();
-    let mut args = Vec::new();
-    args.push("pget".to_owned());
-    push_creds(&mut args, creds);
-    args.push(prop);
-    args.push(path.to_string());
-    let output = svn::run_svn(&args, svn::USE_CWD)?;
-    if output.status.success() {
+    let output = svn::SvnCmd::new("pget")
+        .with_creds(creds)
+        .arg(if global { "svn:global-ignores" } else { "svn:ignore" })
+        .arg(path)
+        .run()?;
+
+        if output.status.success() {
         Ok(Some(String::from_utf8_lossy(&output.stdout).into_owned()))
     }
     else {

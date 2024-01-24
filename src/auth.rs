@@ -72,13 +72,15 @@ pub fn get_credentials() -> Result<Option<Credentials>>
     }
 }
 
+//  Check to see if we can access the repository by
+//  running svn info ^/
 fn access_repo(credentials: Option<Credentials>, wc_root: &Path) -> Result<bool> {
-    let mut args = Vec::new();
-    args.push("info".to_string());
-    push_creds(&mut args, &credentials);
-    args.push("^/".to_string());
+    let output = svn::SvnCmd::new("info")
+        .with_creds(&credentials)
+        .with_cwd(Some(wc_root))
+        .arg("^/")
+        .run()?;
 
-    let output = svn::run_svn(&args, Some(wc_root))?;
     if output.status.success() {
         Ok(true)
     }
@@ -89,13 +91,6 @@ fn access_repo(credentials: Option<Credentials>, wc_root: &Path) -> Result<bool>
         } else {
             Err(SvnError(output).into())
         }
-    }
-}
-
-pub fn push_creds(args: &mut Vec<String>, creds: &Option<Credentials>) -> () {
-    if let Some(Credentials(username, password)) = creds {
-        args.push(format!("--username={}", username));
-        args.push(format!("--password={}", password));
     }
 }
 
