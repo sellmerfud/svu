@@ -3,7 +3,6 @@ use clap::Parser;
 use super::*;
 use anyhow::Result;
 use std::fs::remove_file;
-use std::env::current_dir;
 
 /// Clean up after a bisect session
 #[derive(Debug, Parser)]
@@ -29,7 +28,7 @@ impl Reset {
     pub fn run(&mut self) -> Result<()> {
         let creds = crate::auth::get_credentials()?;
         let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
-        let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
+        let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
         let wc_path = wc_root.to_string_lossy();
     
         if let Some(data) = load_bisect_data()? {

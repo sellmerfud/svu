@@ -23,11 +23,11 @@ pub struct Pop {
 
 impl Pop {
     pub fn run(&mut self) -> Result<()> {
-        svn::workingcopy_info()?;  // Make sure we are in a working copy.
+        let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
+        let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
         let mut stash_entries = load_stash_entries()?;
         if self.stash_id < stash_entries.len() {
             let stash = stash_entries.remove(self.stash_id);
-            let wc_root = svn::workingcopy_root(Path::new(".")).unwrap();
             apply_stash(&stash, &wc_root, self.dry_run)?;
     
             if !self.dry_run {

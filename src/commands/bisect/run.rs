@@ -33,8 +33,8 @@ pub struct Run {
 
 impl Run {
     pub fn run(&mut self) -> Result<()> {
-        let _       = svn::workingcopy_info()?;  // Make sure we are in a working copy.
-        let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
+        let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
+        let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
         let data    = get_bisect_data()?;  // Make sure a bisect session has benn started
     
         if let Some(status) = get_waiting_status(&data) {
@@ -49,14 +49,13 @@ impl Run {
         else {
             
             loop {
-                let wc_info = svn::workingcopy_info()?;
                 let data    = get_bisect_data()?;
                 let cmd     = process::Command::new(self.cmd.as_str())
-                .current_dir(&wc_root)
-                .args(self.args.iter())
-                .stdout(process::Stdio::inherit())
-                .stderr(process::Stdio::inherit())
-                .output()?;
+                    .current_dir(&wc_root)
+                    .args(self.args.iter())
+                    .stdout(process::Stdio::inherit())
+                    .stderr(process::Stdio::inherit())
+                    .output()?;
         
                 let exit_code = match cmd.status.code() {
                     Some(code) => code,

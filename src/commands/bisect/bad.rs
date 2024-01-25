@@ -2,7 +2,6 @@
 use clap::Parser;
 use super::*;
 use anyhow::Result;
-use std::env::current_dir;
 use std::sync::OnceLock;
 
 
@@ -40,7 +39,7 @@ impl Bad {
     pub fn run(&mut self) -> Result<()> {
         let creds = crate::auth::get_credentials()?;
         let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
-        let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
+        let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
         let data = get_bisect_data()?;
         let revision = match &self.revision {
             Some(rev) => svn::resolve_revision(&creds, &rev, &wc_root.to_string_lossy().as_ref())?,

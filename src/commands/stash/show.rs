@@ -3,7 +3,7 @@ use clap::Parser;
 use super::*;
 use anyhow::Result;
 use crate::util::{display_svn_datetime, print_diff_line};
-use crate::svn::{self, workingcopy_root};
+use crate::svn;
 use std::env::current_dir;
 use std::io::{BufReader, BufRead};
 use pathdiff::diff_paths;
@@ -28,12 +28,12 @@ pub struct Show {
 impl Show {
     pub fn run(&mut self) -> Result<()> {
     
-        svn::workingcopy_info()?;  // Make sure we are in a working copy.
+        let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
         let stash_entries = load_stash_entries()?;
     
         if self.stash_id < stash_entries.len() {
             let cwd        = current_dir()?;
-            let wc_root    = workingcopy_root(&cwd).unwrap();
+            let wc_root    = PathBuf::from(wc_info.wc_path.unwrap());
             let stash      = &stash_entries[self.stash_id];
             let patch_file = stash_path()?.join(stash.patch_name.as_str());
             let rel_patch  = diff_paths(&patch_file, &cwd).unwrap();

@@ -3,7 +3,7 @@ use anyhow::Result;
 use std::env;
 use std::io::Write;
 use crate::util::SvError::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use crate::svn;
 
 #[derive(Debug, Clone)]
@@ -24,9 +24,8 @@ pub struct Credentials(pub String, pub String);   // username and password
 
 pub fn get_credentials() -> Result<Option<Credentials>> 
 {
-    let _       = svn::workingcopy_info()?;  // Ensure we are in working copy directory
-    let cwd     = env::current_dir()?;
-    let wc_root = svn::workingcopy_root(&cwd).unwrap();
+    let wc_info = svn::workingcopy_info()?;  // Ensure we are in working copy directory
+    let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
 
     let username = env::var("SVU_USERNAME").ok();
     let password = env::var("SVU_PASSWORD").ok();

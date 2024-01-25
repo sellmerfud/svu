@@ -15,11 +15,11 @@ use anyhow::Result;
 )]    
 pub struct Start {
     /// A revision that is known to not contain the bug
-    #[arg(short, long, value_name = "REV")]
+    #[arg(short, long = "good", value_name = "REV")]
     good_rev: Option<String>,
 
     /// A revision that is known to contain the bug
-    #[arg(short, long, value_name = "REV")]
+    #[arg(short, long = "bad", value_name = "REV")]
     bad_rev: Option<String>,
 
     /// An alternate name for the 'good' subcommand

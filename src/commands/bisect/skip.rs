@@ -22,13 +22,13 @@ impl Skip {
     pub fn run(&mut self) -> Result<()> {
         let creds = crate::auth::get_credentials()?;
         let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
-        let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
-        let wc_root_path = wc_root.to_string_lossy();
+        let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
+        let wc_root_str = wc_root.to_string_lossy();
         let _ = get_bisect_data()?;  // Ensure a bisect session has started
     
         let mut skipped = HashSet::<String>::new();
         for rev in &self.revisions {
-            skipped.extend(gather_revisions(&creds, rev, &wc_root_path)?);
+            skipped.extend(gather_revisions(&creds, rev, &wc_root_str)?);
         }
         //  If not revisions specified, use the working copy rev
         if skipped.is_empty() {

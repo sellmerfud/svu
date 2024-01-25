@@ -264,9 +264,8 @@ pub fn looks_like_revision_range(text: &str) -> bool {
 //  available revision if possible.
 fn get_revision_number(creds: &Option<Credentials>, rev: &str, delta: i32, path: &str) -> Result<String> {
     let rev_str = match delta {
-        0          =>  rev.to_string(),
-        d if d < 0 => format!("{}:0", rev),
-        _          => format!("{}:HEAD", rev),
+        d if d <= 0 => format!("{}:0", rev),
+        _           => format!("{}:HEAD", rev),
     };
     let limit = Some(delta.abs() as u32 + 1);
     let entries = log(&creds, &[path], &[&rev_str], false, limit, false, false)?;
@@ -319,44 +318,14 @@ pub fn resolve_revision_range(creds: &Option<Credentials>, rev_string: &str, pat
     }
 }
 
-//  Return the path to the working copy root directory.
-pub fn workingcopy_root(working_dir: &Path) -> Option<PathBuf> {
-
-    fn find_it(path: &Path) -> Option<&Path> {
-        let mut target = PathBuf::from(path);
-        target.push(".svn");
-        if target.is_dir() {
-            Some(path)
-        }
-        else if let Some(parent) = path.parent() {
-            // Relative paths with a single component will return an emtpy parent
-            if parent == Path::new("") {
-                None
-            }
-            else {
-                find_it(parent)
-            }
-        }
-        else {
-            None
-        }
-    }
-
-    if let Some(wd) = working_dir.canonicalize().ok() {
-        find_it(&wd).map(PathBuf::from)
-    }
-    else {
-        None
-    }
-}
-
 //  Returns the branch name and current commit revision
 //  for the given working copy path.
 pub fn current_branch(path: &Path) -> Result<(String, String)> {
-    match workingcopy_root(path) {
+    let path_info = info(&None, &path.to_string_lossy(), None)?;
+    match path_info.wc_path {
         Some(wc_root) => {
-            let path_info = info(&None, wc_root.to_string_lossy().as_ref(), None)?;
-            Ok((path_info.rel_url, path_info.commit_rev))
+            let wc_info = info(&None, &wc_root, None)?;
+            Ok((wc_info.rel_url, path_info.commit_rev))
         }
         None => {
             let disp = path.to_string_lossy();
@@ -469,8 +438,6 @@ fn get_log_entry_paths(log_entry: &Node) -> Vec<LogPath> {
 
     paths
 }
-
-
 
 fn parse_svn_log(text: &str) -> Result<Vec<LogEntry>> {
     let mut entries = vec![];

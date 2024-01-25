@@ -18,8 +18,8 @@ pub struct Replay {
 
 impl Replay {
     pub fn run(&mut self) -> Result<()> {
-        svn::workingcopy_info()?;  // Make sure we are in a working copy.
-        let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
+        let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
+        let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
         let mut args = Vec::new();
         args.push(self.log_fiie.clone());
     

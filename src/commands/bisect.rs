@@ -304,7 +304,8 @@ fn perform_bisect(data: &BisectData) -> Result<bool> {
 
 fn update_workingcopy(revision: &String) -> Result<()> {
     let msg = get_1st_log_message(revision)?;
-    let wc_root = svn::workingcopy_root(&current_dir()?).unwrap();
+    let wc_info = svn::workingcopy_info()?;
+    let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
     println!("Updating working copy: [{}] {}", revision.yellow(), msg);
     svn::update(revision, "infinity", Some(&wc_root))?;
     Ok(())

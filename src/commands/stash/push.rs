@@ -35,8 +35,8 @@ impl Push {
 
     pub fn run(&mut self) -> Result<()> {
 
-        svn::workingcopy_info()?;  // Make sure we are in a working copy.
-        let wc_root = svn::workingcopy_root(Path::new(".")).unwrap();
+        let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
+        let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
         let items = get_stash_items(&wc_root, self.args.unversioned)?;
     
         if items.is_empty() {
