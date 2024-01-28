@@ -20,12 +20,10 @@ impl Replay {
     pub fn run(&mut self) -> Result<()> {
         let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
         let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
-        let mut args = Vec::new();
-        args.push(self.log_fiie.clone());
     
         let cmd = process::Command::new("/bin/sh")
             .current_dir(wc_root)
-            .args(args)
+            .args([self.log_fiie.clone()])
             .stdout(process::Stdio::inherit())
             .stderr(process::Stdio::inherit())
             .output()?;

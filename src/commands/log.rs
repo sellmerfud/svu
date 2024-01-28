@@ -127,7 +127,7 @@ impl Log {
             if path_info.kind == "dir" {
                 Some(path_info.commit_rev)
             } else {
-                let parent_info = svn::info(&creds, &parent_dir(&wc_path), None)?;
+                let parent_info = svn::info(&creds, &parent_dir(wc_path), None)?;
                 Some(parent_info.commit_rev)
             }
         } else {

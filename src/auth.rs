@@ -36,7 +36,7 @@ pub fn get_credentials() -> Result<Option<Credentials>>
                 Ok(Some(Credentials(u, p)))
             }
             else {
-                return Err(General("Not a valid SVU_USERNAME/SVU_PASSWORD.".to_string()).into())
+                Err(General("Not a valid SVU_USERNAME/SVU_PASSWORD.".to_string()).into())
             }
         }
         (None, Some(_)) => Err(General("SVU_USERNAME enviromnet variable must be set if using SVU_PASSWORD".to_string()).into()),

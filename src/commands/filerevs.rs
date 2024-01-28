@@ -88,11 +88,11 @@ impl Filerevs {
             branch_prefixes.sort();
             let acceptable = |branch: &String| -> bool {
                 !all_prefixes.contains(branch) &&
-                (all || regexes.into_iter().any(|re| re.is_match(&branch)))
+                (all || regexes.iter().any(|re| re.is_match(branch)))
             };
     
             for prefix in &branch_prefixes {
-                let path_list = svn::path_list(&creds, &join_paths(root_url, prefix))?;
+                let path_list = svn::path_list(creds, &join_paths(root_url, prefix))?;
                 for entry in &path_list.entries {
                     let branch = join_paths(prefix, &entry.name);
                     if acceptable(&branch) {
@@ -113,11 +113,11 @@ impl Filerevs {
             tag_prefixes.sort();
             let acceptable = |tag: &String| -> bool {
                 !all_prefixes.contains(tag) &&
-                (all || regexes.into_iter().any(|re| re.is_match(&tag)))
+                (all || regexes.iter().any(|re| re.is_match(tag)))
             };
     
             for prefix in &tag_prefixes {
-                let path_list = svn::path_list(&creds, &join_paths(root_url, prefix))?;
+                let path_list = svn::path_list(creds, &join_paths(root_url, prefix))?;
                 for entry in &path_list.entries {
                     let tag = join_paths(prefix, &entry.name);
                     if acceptable(&tag) {
@@ -163,7 +163,7 @@ fn show_path_result(creds: &Option<Credentials>, root_url: &str, path_entry: &Sv
     let results = prefixes.par_iter()
         .map(|prefix| {
             let path = join_paths(join_paths(root_url, prefix.as_str()), rel_path.as_str());
-            let info = svn::info(&creds, path.as_str(), Some("HEAD")).ok().map(|i| Box::new(i));
+            let info = svn::info(creds, path.as_str(), Some("HEAD")).ok().map(Box::new);
             Entry(prefix.clone(), info)
         })
         .collect::<Vec<Entry>>();

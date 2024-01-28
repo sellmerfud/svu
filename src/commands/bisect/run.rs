@@ -67,9 +67,9 @@ impl Run {
                     
                 match exit_code {
                     0 => {
-                        display_command(&data.good_name());
+                        display_command(data.good_name());
                         let complete = mark_good_revision(&wc_info.commit_rev)?;
-                        log_command(&data.good_name())?;
+                        log_command(data.good_name())?;
                         if complete { break }
                     }
                     125 => {
@@ -82,9 +82,9 @@ impl Run {
     
                     },
                     code if code < 128 => {
-                        display_command(&data.bad_name());
+                        display_command(data.bad_name());
                         let complete = mark_bad_revision(&wc_info.commit_rev)?;
-                        log_command(&data.bad_name())?;
+                        log_command(data.bad_name())?;
                         if complete { break }
                     }
                     code => {
@@ -100,7 +100,7 @@ impl Run {
 }
 
 
-fn display_command(name: &str) -> () {
+fn display_command(name: &str) {
     let cmd: String = std::env::args().take(1).collect();
     println!("{} bisect {}", cmd, name);
 }

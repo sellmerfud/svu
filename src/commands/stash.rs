@@ -62,8 +62,8 @@ impl Stash {
 
     pub fn run(&mut self) -> Result<()> {
         match &mut self.command {
-            None             => push::Push::new(&self.push_args).run(),
-            Some(Push(args)) => push::Push::new(&args).run(),
+            None             => push::Push::new(self.push_args.clone()).run(),
+            Some(Push(args)) => push::Push::new(args.clone()).run(),
             Some(Pop(cmd))   => cmd.run(),
             Some(Apply(cmd)) => cmd.run(),
             Some(Drop(cmd))  => cmd.run(),
@@ -108,13 +108,13 @@ fn stash_entries_file() -> Result<PathBuf> {
     Ok(stash_path()?.join("stash_entries.json"))
 }
 
-const UNVERSIONED: &'static str = "unversioned";
-const NORMAL:      &'static str = "normal";
-const ADDED:       &'static str = "added";
+const UNVERSIONED: &str = "unversioned";
+const NORMAL:      &str = "normal";
+const ADDED:       &str = "added";
 #[allow(dead_code)]
-const DELETED:     &'static str = "deleted";
+const DELETED:     &str = "deleted";
 #[allow(dead_code)]
-const MODIFIED:    &'static str = "modified";
+const MODIFIED:    &str = "modified";
 
 // path for directories wil end with a slash/  (only happens for removed directories)
 // revision of the file when it was modified (for display only)
@@ -129,7 +129,7 @@ const MODIFIED:    &'static str = "modified";
 }
 
 impl StashItem {
-    fn status_letter<'a>(&'a self) -> &'static str {
+    fn status_letter(&self) -> &'static str {
         match self.status.as_str() {
             UNVERSIONED => "?",
             ADDED       => "A",
@@ -139,7 +139,7 @@ impl StashItem {
         }
     }
 
-    fn status_color<'a>(&'a self) -> &'static str {
+    fn status_color(&self) -> &'static str {
         match self.status.as_str() {
             UNVERSIONED => "white",
             ADDED       => "green",
@@ -249,7 +249,7 @@ fn get_stash_items(wc_root: &Path, unversioned: bool) -> Result<Vec<StashItem>> 
             //  status values back to "unversioned" so we can restore the properly when the stash is reapplied.
             //  If there were no unversioned directores in the initial list then this is not necessary.
 
-            svn::add(&unversioned_paths, &"infinity", false, Some(wc_root))?;
+            svn::add(&unversioned_paths, "infinity", false, Some(wc_root))?;
 
             if initial_items.iter().any(|i| i.is_dir && i.status == UNVERSIONED) {
 
@@ -273,7 +273,7 @@ fn get_stash_items(wc_root: &Path, unversioned: bool) -> Result<Vec<StashItem>> 
     }
 
     match get_wc_items(wc_root, unversioned)? {
-        items if unversioned => Ok(fixup_unversioned_items(&items, &wc_root)?.into_owned()),
+        items if unversioned => Ok(fixup_unversioned_items(&items, wc_root)?.into_owned()),
         items => Ok(items)
     }
 }
@@ -282,7 +282,7 @@ fn apply_stash(stash: &StashFileEntry, wc_root: &Path, dry_run: bool) -> Result<
     let path_re    = Regex::new(r"^([ADUCG>])(\s+)(.+)$")?;
     let patch_file = stash_path()?.join(&stash.patch_name);
     let cwd        = current_dir()?;
-    let stdout     = svn::apply_patch(&patch_file, dry_run, Some(&wc_root))?;
+    let stdout     = svn::apply_patch(&patch_file, dry_run, Some(wc_root))?;
     let mut last_status = "".to_string();
 
     for line in stdout.lines() {
@@ -336,7 +336,7 @@ fn apply_stash(stash: &StashFileEntry, wc_root: &Path, dry_run: bool) -> Result<
                 .iter()
                 .filter_map(|i| if can_skip(i) { None } else { Some(i.path.clone()) })
                 .collect();
-            svn::revert(&revert_paths, "infinity", false, Some(&wc_root))?;
+            svn::revert(&revert_paths, "infinity", false, Some(wc_root))?;
         }
 
         println!("Updated working copy state: {}", stash.summary_display());

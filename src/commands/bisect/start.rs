@@ -50,10 +50,10 @@ impl Start {
             },
             None => {
                 let good = self.good_rev.as_ref()
-                    .map(|rev| svn::resolve_revision(&creds, &rev, "."))
+                    .map(|rev| svn::resolve_revision(&creds, rev, "."))
                     .transpose()?;
                 let bad = self.bad_rev.as_ref()
-                    .map(|rev| svn::resolve_revision(&creds, &rev, "."))
+                    .map(|rev| svn::resolve_revision(&creds, rev, "."))
                     .transpose()?;
     
                 match (&good, &bad) {

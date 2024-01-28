@@ -11,8 +11,7 @@ pub fn bad_term() -> &'static String {
         load_bisect_data()
             .ok()
             .flatten()
-            .map(|data| data.term_bad)
-            .flatten()
+            .and_then(|data| data.term_bad)
             .unwrap_or("".to_owned())
     })
 }
@@ -42,14 +41,14 @@ impl Bad {
         let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
         let data = get_bisect_data()?;
         let revision = match &self.revision {
-            Some(rev) => svn::resolve_revision(&creds, &rev, &wc_root.to_string_lossy().as_ref())?,
+            Some(rev) => svn::resolve_revision(&creds, rev, wc_root.to_string_lossy().as_ref())?,
             None      => wc_info.commit_rev,
         };
     
           // The new bad revision can come after the existing maxRev
           // This allows the user to recheck a range of commits.
           // The new bad revision cannot be less than or equal to the minRev
-        if data.min_rev.is_some() && to_rev_num(&revision) <= to_rev_num(&data.min_rev.as_ref().unwrap())  {
+        if data.min_rev.is_some() && to_rev_num(&revision) <= to_rev_num(data.min_rev.as_ref().unwrap())  {
             println!("The '{}' revision must be more recent than the '{}' revision", data.bad_name(), data.good_name());
         }
         else {

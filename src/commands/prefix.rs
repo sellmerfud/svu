@@ -61,10 +61,7 @@ impl Prefix {
                 .collect();
             prefixes.branch_prefixes.extend(to_add);
     
-            prefixes.branch_prefixes = prefixes.branch_prefixes
-                .into_iter()
-                .filter(|e| !self.rem_branch.contains(&e))
-                .collect();
+            prefixes.branch_prefixes.retain(|e| !self.rem_branch.contains(e));
     
             if prefixes.branch_prefixes.is_empty() {
                 prefixes.branch_prefixes.push("branches".to_string());
@@ -80,10 +77,7 @@ impl Prefix {
                 .collect();
             prefixes.tag_prefixes.extend(to_add);
     
-            prefixes.tag_prefixes = prefixes.tag_prefixes
-                .into_iter()
-                .filter(|e| !self.rem_tag.contains(&e))
-                .collect();
+            prefixes.tag_prefixes.retain(|e| !self.rem_tag.contains(e));
     
             if prefixes.tag_prefixes.is_empty() {
                 prefixes.tag_prefixes.push("tags".to_string());
@@ -129,6 +123,6 @@ fn parse_prefix(arg: &str) -> Result<String> {
         Err(General("Prefix cannot refer to the repository root".to_string()).into())
     }
     else {
-        Ok(arg[2..].trim_end_matches("/").to_string())
+        Ok(arg[2..].trim_end_matches('/').to_string())
     }
 }

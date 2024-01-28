@@ -28,12 +28,11 @@ impl Ignore {
         let creds = crate::auth::get_credentials()?;
         let prefix_len = self.path.trim_end_matches('/').len() + 1; // Add one for trailing slash
     
-        fn ignore_lines(lines: &String) -> impl Iterator<Item = &str> {
+        fn ignore_lines(lines: &str) -> impl Iterator<Item = &str> {
             lines
-            .split("\n")
+            .split('\n')
             .map(|l| l.trim())  // Clean up and skip blank lines
             .filter(|l| !l.is_empty())
-            .into_iter()
         }
     
         fn svn_ignore(creds: &Option<Credentials>, dir_path: &str, prefix_len: usize) -> Result<()> {
@@ -62,7 +61,7 @@ impl Ignore {
             print_ignores(true)?;
     
             //  Recursively process all subdirectories
-            let path_list = svn::path_list(&creds, dir_path)?;
+            let path_list = svn::path_list(creds, dir_path)?;
             for sub_dir in &path_list.entries {
                 if sub_dir.kind == "dir" {
                     let subdir_path = util::join_paths(dir_path, sub_dir.name.trim_end_matches('/'));

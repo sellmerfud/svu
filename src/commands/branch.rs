@@ -48,8 +48,8 @@ pub struct Branch {
 impl Branch {
 
     fn no_arguments(&self) -> bool {
-        self.all_branches == false &&
-        self.all_tags == false &&
+        !self.all_branches &&
+        !self.all_tags &&
         self.branch_regexes.is_empty() &&
         self.tag_regexes.is_empty()
     }
@@ -73,7 +73,7 @@ impl Branch {
     }
 
     fn show_current_branch(&self) -> Result<()> {
-        if self.path.starts_with("^") || self.path.contains("://") {
+        if self.path.starts_with('^') || self.path.contains("://") {
             return Err(General("Cannot show the current branch of a URL".to_string()).into())
         }
     

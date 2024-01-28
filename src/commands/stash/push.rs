@@ -29,8 +29,8 @@ pub struct Push {
 
 
 impl Push {
-    pub fn new(args: &PushArgs) -> Self {
-        Push { args: args.clone() }
+    pub fn new(args: PushArgs) -> Self {
+        Push { args }
     }
 
     pub fn run(&mut self) -> Result<()> {

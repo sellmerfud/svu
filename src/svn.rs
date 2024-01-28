@@ -267,8 +267,8 @@ fn get_revision_number(creds: &Option<Credentials>, rev: &str, delta: i32, path:
         d if d <= 0 => format!("{}:0", rev),
         _           => format!("{}:HEAD", rev),
     };
-    let limit = Some(delta.abs() as u32 + 1);
-    let entries = log(&creds, &[path], &[&rev_str], false, limit, false, false)?;
+    let limit = Some(delta.unsigned_abs() + 1);
+    let entries = log(creds, &[path], &[&rev_str], false, limit, false, false)?;
     entries
         .last()
         .map(|log| log.revision.to_owned())
@@ -302,13 +302,13 @@ pub fn resolve_revision(creds: &Option<Credentials>, rev_string: &str, path: &st
 //  then we must use svn log to get the actual revsion.
 //  In order to resovle the string using svn log we need a working copy path.
 pub fn resolve_revision_range(creds: &Option<Credentials>, rev_string: &str, path: &str) -> Result<String> {
-    let parts: Vec<&str> = rev_string.split(":").collect();
+    let parts: Vec<&str> = rev_string.split(':').collect();
     let re = Regex::new(r"[-+]")?;
     match parts.len() {
-        1 => resolve_revision(creds, &parts[0], path),
+        1 => resolve_revision(creds, parts[0], path),
         2 => {
-            let a = if re.is_match(&parts[0]) {resolve_revision(creds, &parts[0], path)? } else { parts[0].to_string()} ;
-            let b = if re.is_match(&parts[1]) {resolve_revision(creds, &parts[1], path)? } else { parts[1].to_string()} ;
+            let a = if re.is_match(parts[0]) {resolve_revision(creds, parts[0], path)? } else { parts[0].to_string()} ;
+            let b = if re.is_match(parts[1]) {resolve_revision(creds, parts[1], path)? } else { parts[1].to_string()} ;
             Ok(format!("{}:{}", a, b))
         }
         _ => {
@@ -430,7 +430,7 @@ fn get_log_entry_paths(log_entry: &Node) -> Vec<LogPath> {
             action:    get_attr(&path_node, "action"),
             text_mods: attr_is(&path_node, "text-mods", "true"),
             prop_mods: attr_is(&path_node, "prop-mods", "true"),
-            from_path: from_path        
+            from_path
         };
 
         paths.push(log_path);
@@ -448,7 +448,7 @@ fn parse_svn_log(text: &str) -> Result<Vec<LogEntry>> {
             revision: get_attr(&log_entry, "revision"),
             author:   get_child_text_or(&log_entry, "author", "n/a"),
             date:     parse_svn_date_opt(get_child_text(&log_entry, "date")),
-            msg:      get_child_text_or(&log_entry, "msg", "").split("\n").map(|s| s.to_owned()).collect(),
+            msg:      get_child_text_or(&log_entry, "msg", "").split('\n').map(|s| s.to_owned()).collect(),
             paths:    get_log_entry_paths(&log_entry)
         };
         entries.push(entry);
@@ -564,7 +564,7 @@ pub fn change_diff(creds: &Option<Credentials>, path: &str, commit_rev: &str) ->
 
     if output.status.success() {
         let text = String::from_utf8_lossy(&output.stdout);
-        Ok(text.split("\n").map(|l| l.to_string()).collect())
+        Ok(text.split('\n').map(|l| l.to_string()).collect())
     }
     else {
         Err(SvnError(output).into())
@@ -572,10 +572,7 @@ pub fn change_diff(creds: &Option<Credentials>, path: &str, commit_rev: &str) ->
 }
 
 fn prefixes_file() -> Result<PathBuf> {
-    match data_directory() {
-        Ok(dir) => Ok(dir.join("prefixes.json")),
-        e @Err(_) => e.into()
-    }
+    data_directory().map(|dir| dir.join("prefixes.json"))
 }
 #[derive(Serialize, Deserialize)]
 pub struct Prefixes {
@@ -621,7 +618,7 @@ fn parse_svn_status(text: &str) -> Result<SvnStatus> {
     let mut entries: Vec<StatusEntry> = vec![];
     let doc = Document::parse(text)?;
     if let Some(target) = doc.descendants().find(|n| n.has_tag_name("target")) {
-        for entry_node in target.children().into_iter() {
+        for entry_node in target.children() {
             if let Some(wc_node) = get_child(&entry_node, "wc-status") {
                 let revision = get_attr(&wc_node, "revision");
                 entries.push(StatusEntry {

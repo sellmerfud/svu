@@ -115,14 +115,14 @@ struct BisectData {
 }
 
 impl BisectData {
-    fn good_name<'a>(&'a self) -> &'a str {
+    fn good_name(&self) -> &str {
         // bad::Bad.name()
         self.term_good.as_ref()
             .map(|s| s.as_ref())
             .unwrap_or("good")
     }
 
-    fn bad_name<'a>(&'a self) -> &'a str {
+    fn bad_name(&self) -> &str {
         // bad::Bad.name()
         self.term_bad.as_ref()
             .map(|s| s.as_ref())
@@ -164,7 +164,7 @@ fn save_bisect_data(data: &BisectData) -> Result<()> {
 //  error if the data file is missing.
 fn get_bisect_data() -> Result<BisectData> {
     load_bisect_data()?
-        .ok_or(General(format!("You must first start a bisect session with the 'bisect start' subcommand.")).into())
+        .ok_or(General("You must first start a bisect session with the 'bisect start' subcommand.".to_string()).into())
 }
 
 fn append_to_log<S>(msg: S) -> Result<()> 
@@ -202,7 +202,7 @@ fn log_bisect_revision(revision: &str, term: &str) -> Result<()> {
 }
 
 fn log_bisect_command(cmd_line: &[String]) -> Result<()> {
-    let line = format!("{}", cmd_line.join(" "));
+    let line = cmd_line.join(" ").to_string();
     append_to_log(line)
 }
 
@@ -253,7 +253,7 @@ fn get_waiting_status(data: &BisectData) -> Option<String> {
 
 fn get_log_entry(revision: &str, with_paths: bool) -> Result<Option<LogEntry>> {
     let log = svn::log(&None, &["."], &[revision], true, Some(1), false, with_paths)?;
-    Ok(log.first().map(|l| l.clone()))
+    Ok(log.first().cloned())
 }
 
 fn perform_bisect(data: &BisectData) -> Result<bool> {
@@ -320,7 +320,7 @@ fn mark_good_revision(revision: &str) -> Result<bool> {
     data.skipped.remove(revision);
     data.min_rev = Some(revision.to_string());
     save_bisect_data(&data)?;
-    log_bisect_revision(revision, &data.good_name())?;
+    log_bisect_revision(revision, data.good_name())?;
     if data.is_ready() {
         perform_bisect(&data)
     } else {
@@ -337,7 +337,7 @@ fn mark_bad_revision(revision: &str) -> Result<bool> {
     data.skipped.remove(revision);
     data.max_rev = Some(revision.to_string());
     save_bisect_data(&data)?;
-    log_bisect_revision(revision, &data.bad_name())?;
+    log_bisect_revision(revision, data.bad_name())?;
     if data.is_ready() {
         perform_bisect(&data)
     } else {
@@ -420,12 +420,12 @@ fn gather_revisions(creds: &Option<Credentials>, rev_str: &str, path: &str) -> R
     let mut revisions = HashSet::new();
 
     if rev_str.contains(':') {
-        let resolved = svn::resolve_revision_range(&creds, rev_str, path)?;
+        let resolved = svn::resolve_revision_range(creds, rev_str, path)?;
         let entries = svn::log(&None, &[path], &[&resolved], false, None, false, false)?;
         revisions.extend(entries.iter().map(|e| e.revision.clone()));
     }
     else {
-        revisions.insert(svn::resolve_revision(&creds, rev_str, path)?);
+        revisions.insert(svn::resolve_revision(creds, rev_str, path)?);
     }
 
     Ok(revisions)

@@ -68,7 +68,7 @@ impl Show {
         }
 
         let log_entry = &svn::log(&creds, &paths, &rev_vector, true, Some(1), false, true)?[0];
-        util::show_commit(&log_entry, !self.no_message, self.show_paths);
+        util::show_commit(log_entry, !self.no_message, self.show_paths);
         if self.show_diff {            
             println!();
             let lines = svn::change_diff(&creds, paths[0], &log_entry.revision)?;

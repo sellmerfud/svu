@@ -34,7 +34,7 @@ impl Reset {
         if let Some(data) = load_bisect_data()? {
             if !self.no_update {
                 let revision = self.revision.as_ref()
-                    .map(|r| svn::resolve_revision(&creds, &r, &wc_path))
+                    .map(|rev| svn::resolve_revision(&creds, rev, &wc_path))
                     .unwrap_or(Ok(data.original_rev))?;
                 update_workingcopy(&revision)?;
             }

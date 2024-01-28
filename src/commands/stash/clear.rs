@@ -28,7 +28,7 @@ impl Clear {
             remove_file(stash_entries_file()?)?;
         }
 
-        if stash_entries.len() == 0 {
+        if stash_entries.is_empty() {
             println!("No stash entries to clear");
         } else {
             println!("Cleared {} stash entries", stash_entries.len());

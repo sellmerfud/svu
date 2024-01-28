@@ -11,8 +11,7 @@ pub fn good_term() -> &'static String {
         load_bisect_data()
             .ok()
             .flatten()
-            .map(|data| data.term_good)
-            .flatten()
+            .and_then(|data| data.term_good)
             .unwrap_or("".to_owned())
     })
 }
@@ -43,14 +42,14 @@ impl Good {
         let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
         let data = get_bisect_data()?;
         let revision = match &self.revision {
-            Some(rev) => svn::resolve_revision(&creds, &rev, &wc_root.to_string_lossy().as_ref())?,
+            Some(rev) => svn::resolve_revision(&creds, rev, wc_root.to_string_lossy().as_ref())?,
             None      => wc_info.commit_rev,
         };
     
         // The new good revision can come before the exisiing minRev
         // This allow the user to recheck a range of commits.
         // The new good revision cannot be greater than or equal to the maxRev
-        if data.max_rev.is_some() && to_rev_num(&revision) >= to_rev_num(&data.max_rev.as_ref().unwrap())  {
+        if data.max_rev.is_some() && to_rev_num(&revision) >= to_rev_num(data.max_rev.as_ref().unwrap())  {
             println!("The '{}' revision must be older than the '{}' revision", data.good_name(), data.bad_name());
         }
         else {

@@ -29,7 +29,7 @@ pub fn join_paths<S, T>(base: S, leaf: T) -> String
 //  We create a .sv directory in the top directory of the working copy
 //  This gives sv commands a place to store data
 //  This will throw an error of the directory cannot be resloved.
-pub fn data_directory<'a>() -> Result<PathBuf> {
+pub fn data_directory() -> Result<PathBuf> {
     let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
     let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
     let path = wc_root.join(".sv");
@@ -62,7 +62,7 @@ pub fn null_date() -> &'static DateTime<Local> {
     NULL_DATE.get_or_init(|| {
         let timestamp_millis: i64 = -2208936075000; //Mon Jan 01 1900 14:38:45 GMT+0000
         let naive_datetime = NaiveDateTime::from_timestamp_millis(timestamp_millis).unwrap();
-        let offset = Local::now().offset().clone();
+        let offset = *Local::now().offset();
         DateTime::<Local>::from_naive_utc_and_offset(naive_datetime, offset)
     })
 }
@@ -130,7 +130,7 @@ pub fn divider(len: usize) -> String {
 }
 
 //  Print formatted commit info to stdout.
-pub fn show_commit(log_entry: &LogEntry, show_msg: bool, show_paths: bool) -> () {
+pub fn show_commit(log_entry: &LogEntry, show_msg: bool, show_paths: bool) {
     let divider = divider(70);
     println!("{}", divider);
     println!("Commit: {}", log_entry.revision.yellow());
@@ -145,7 +145,7 @@ pub fn show_commit(log_entry: &LogEntry, show_msg: bool, show_paths: bool) -> ()
     }
     println!();
 
-    if log_entry.paths.len() > 0 {
+    if !log_entry.paths.is_empty() {
         struct Totals{ pub chg: u16, pub add:u16, pub del:u16, pub rep:u16 }
         let mut totals = Totals { chg: 0, add: 0, del: 0, rep: 0};
         
@@ -171,15 +171,13 @@ pub fn show_commit(log_entry: &LogEntry, show_msg: bool, show_paths: bool) -> ()
     }
 }
 
-pub fn print_diff_line(line: &str) -> () {
-    let color = if line.starts_with("---") { "blue" }
-           else if line.starts_with("+++") { "blue" }
-           else if line.starts_with("Index:") { "yellow" }
-           else if line.starts_with("==========") { "yellow" }
+pub fn print_diff_line(line: &str) {
+    let color = if line.starts_with("---") || line.starts_with("+++") { "blue" }
+           else if line.starts_with("Index:") || line.starts_with("==========") { "yellow" }
            else if line.starts_with("Property changes on:") { "magenta" }
-           else if line.starts_with("+") { "green" }
+           else if line.starts_with('+') { "green" }
            else if line.starts_with("@@") { "gray" }
-           else if line.starts_with("-") { "red" }
+           else if line.starts_with('-') { "red" }
            else { "white" };
 
     println!("{}", line.color(color));
