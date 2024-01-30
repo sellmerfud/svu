@@ -10,7 +10,7 @@ use std::fs::remove_file;
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
-)]    
+)]
 pub struct Drop {
     /// Id of the stash you wish to apply and drop
     #[arg(value_name = "STASH", value_parser = parse_stash_id, default_value = "stash-0")]
@@ -19,7 +19,7 @@ pub struct Drop {
 
 impl Drop {
     pub fn run(&mut self) -> Result<()> {
-        svn::workingcopy_info()?;  // Make sure we are in a working copy.
+        svn::workingcopy_info()?; // Make sure we are in a working copy.
         let mut stash_entries = load_stash_entries()?;
         if self.stash_id < stash_entries.len() {
             let stash = stash_entries.remove(self.stash_id);
@@ -30,7 +30,10 @@ impl Drop {
             Ok(())
         }
         else {
-            let msg = format!("{} does not exist in the stash", stash_id_display(self.stash_id));
+            let msg = format!(
+                "{} does not exist in the stash",
+                stash_id_display(self.stash_id)
+            );
             Err(General(msg).into())
         }
     }

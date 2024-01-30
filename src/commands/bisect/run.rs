@@ -20,7 +20,7 @@ use std::collections::HashSet;
    as the highest sensible value to use for this purpose, because 126 and 127 are used by POSIX shells to\n\
    signal specific error status (127 is for command not found, 126 is for command found but not executable\n\
    these details do not matter, as they are normal errors in the script, as far as bisect run is concerned)."
-)]    
+)]
 pub struct Run {
     /// Name of a command (script) to run
     #[arg(value_name = "CMD", num_args = 1..=1, required = true)]
@@ -36,17 +36,16 @@ impl Run {
         let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
         let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
         let data    = get_bisect_data()?;  // Make sure a bisect session has benn started
-    
+
         if let Some(status) = get_waiting_status(&data) {
             println!("{}", status);
         }
-    
+
         if !data.is_ready() {
             let msg = format!("'bisect run' cannot be used until a '{}' revision and a '{}' revision have been specified",
                 data.good_name(), data.bad_name());
             Err(General(msg).into())
-        }
-        else {
+        } else {
             
             loop {
                 let data    = get_bisect_data()?;
@@ -61,16 +60,18 @@ impl Run {
                     Some(code) => code,
                     None => {
                         let msg = format!("Command '{}' failed to execute", self.cmd);
-                        return Err(General(msg).into())
+                        return Err(General(msg).into());
                     }
                 };
-                    
+
                 match exit_code {
                     0 => {
                         display_command(data.good_name());
                         let complete = mark_good_revision(&wc_info.commit_rev)?;
                         log_command(data.good_name())?;
-                        if complete { break }
+                        if complete {
+                            break
+                        }
                     }
                     125 => {
                         display_command("skip");
@@ -78,19 +79,23 @@ impl Run {
                         revs.insert(wc_info.commit_rev.clone());
                         let complete = mark_skipped_revisions(&revs)?;
                         log_command("skip")?;
-                        if complete { break }
+                        if complete {
+                            break
+                        }
     
                     },
                     code if code < 128 => {
                         display_command(data.bad_name());
                         let complete = mark_bad_revision(&wc_info.commit_rev)?;
                         log_command(data.bad_name())?;
-                        if complete { break }
+                        if complete {
+                            break
+                        }
                     }
                     code => {
                         let msg = format!("'bisect run' failed. Command '{}' returned unrecoverable error coce ({})",
                         self.cmd, code);
-                        return Err(General(msg).into())
+                        return Err(General(msg).into());
                     }
                 }
             }

@@ -10,14 +10,14 @@ use std::fs::remove_file;
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
-)]    
+)]
 pub struct Clear;
 
 impl Clear {
     pub fn run(&mut self) -> Result<()> {
-        svn::workingcopy_info()?;  // Make sure we are in a working copy.
+        svn::workingcopy_info()?; // Make sure we are in a working copy.
         let stash_entries_path = stash_entries_file()?;
-        let stash_entries      = load_stash_entries()?; 
+        let stash_entries = load_stash_entries()?;
 
         // Remove all of the associated patch files
         for stash in &stash_entries {

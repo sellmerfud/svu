@@ -19,7 +19,9 @@ use serde::{Deserialize, Serialize};
 fn svn_cmd() -> &'static String {
     static SVN_CMD: OnceLock<String> = OnceLock::new();
     SVN_CMD.get_or_init(|| {
-        env::var("SVU_SVN").map(|s| s.clone()).unwrap_or("svn".to_string())
+        env::var("SVU_SVN")
+            .map(|s| s.clone())
+            .unwrap_or("svn".to_string())
     })
 }
 
@@ -41,10 +43,10 @@ pub struct LogPath {
 #[derive(Debug, Clone)]
 pub struct LogEntry {
     pub revision: String,
-    pub author:   String,
-    pub date:     DateTime<Local>,
-    pub msg:      Vec<String>,
-    pub paths:    Vec<LogPath>,
+    pub author: String,
+    pub date: DateTime<Local>,
+    pub msg: Vec<String>,
+    pub paths: Vec<LogPath>,
 }
 
 impl LogEntry {
@@ -52,8 +54,7 @@ impl LogEntry {
     pub fn msg_1st(&self) -> String {
         if self.msg.is_empty() {
             "".to_string()
-        }
-        else {
+        } else {
             self.msg[0].clone()
         }
     }
@@ -61,33 +62,33 @@ impl LogEntry {
 
 #[derive(Debug, Clone)]
 pub struct SvnInfo {
-    pub path:           String,
-    pub repo_rev:       String,
-    pub kind:           String,
-    pub size:           Option<u64>,
-    pub url:            String,
-    pub rel_url:        String,
-    pub root_url:       String,
-    pub repo_uuid:      String,
-    pub commit_rev:     String,
-    pub commit_author:  String,
-    pub commit_date:    DateTime<Local>,
-    pub wc_path:        Option<String>,  
+    pub path: String,
+    pub repo_rev: String,
+    pub kind: String,
+    pub size: Option<u64>,
+    pub url: String,
+    pub rel_url: String,
+    pub root_url: String,
+    pub repo_uuid: String,
+    pub commit_rev: String,
+    pub commit_author: String,
+    pub commit_date: DateTime<Local>,
+    pub wc_path: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ListEntry {
-    pub name:          String,
-    pub kind:          String,
-    pub size:          Option<u64>,
-    pub commit_rev:    String,
+    pub name: String,
+    pub kind: String,
+    pub size: Option<u64>,
+    pub commit_rev: String,
     pub commit_author: String,
-    pub commit_date:   DateTime<Local>
+    pub commit_date: DateTime<Local>
 }
 
 #[derive(Debug, Clone)]
 pub struct SvnList {
-    pub path:    String,
+    pub path: String,
     pub entries: Vec<ListEntry>
 }
 
@@ -111,14 +112,13 @@ pub struct SvnCmd {
     cwd: Option<PathBuf>,
     name: String,
     args: Vec<String>,
-
 }
 
 impl SvnCmd {
     pub fn new<S>(name: S) -> Self
     where
         S: AsRef<str> + Display
-     {
+    {
         SvnCmd {
             cwd: None,
             name: name.as_ref().to_string(),
@@ -126,15 +126,14 @@ impl SvnCmd {
         }
     }
 
-    pub fn with_cwd(&mut self, cwd: Option<&Path>) -> &mut Self
-    {
+    pub fn with_cwd(&mut self, cwd: Option<&Path>) -> &mut Self {
         if let Some(cwd) = cwd {
             self.cwd = Some(PathBuf::from(cwd));
         }
         self
     }
 
-    
+
     pub fn with_creds(&mut self, creds: &Option<Credentials>) -> &mut Self {
         if let Some(Credentials(username, password)) = creds {
             self.arg(format!("--username={}", username));
@@ -145,7 +144,7 @@ impl SvnCmd {
 
     pub fn arg<S>(&mut self, arg: S) -> &mut Self
     where
-        S: AsRef<str> + Display
+        S: AsRef<str> + Display,
     {
         self.args.push(arg.as_ref().to_string());
         self
@@ -153,7 +152,7 @@ impl SvnCmd {
 
     pub fn arg_if<S>(&mut self, cond: bool, arg: S) -> &mut Self
     where
-        S: AsRef<str> + Display
+        S: AsRef<str> + Display,
     {
         if cond {
             self.arg(arg);
@@ -163,7 +162,7 @@ impl SvnCmd {
 
     pub fn opt_arg<S>(&mut self, arg: &Option<S>) -> &mut Self
     where
-        S: AsRef<str> + Display
+        S: AsRef<str> + Display,
     {
         if let Some(arg) = arg {
             self.arg(arg);
@@ -174,16 +173,14 @@ impl SvnCmd {
     pub fn args<I, S>(&mut self, args: I) -> &mut Self
     where
         I: IntoIterator<Item = S>,
-        S: AsRef<str> + Display
+        S: AsRef<str> + Display,
     {
-        let args = args
-            .into_iter()
-            .map(|a| a.as_ref().to_string());
+        let args = args.into_iter().map(|a| a.as_ref().to_string());
         self.args.extend(args);
         self
     }
 
-    pub fn run(&mut self) -> Result<Output>  {
+    pub fn run(&mut self) -> Result<Output> {
         let mut cmd = Command::new(svn_cmd());
         if let Some(dir) = &self.cwd {
             cmd.current_dir(dir);
@@ -198,18 +195,18 @@ impl SvnCmd {
 
 // Functions for accessing data in XML nodes
 
-fn get_attr(n: &Node, name: &str) -> String { 
+fn get_attr(n: &Node, name: &str) -> String {
     n.attribute(name).unwrap_or("").to_owned()
 }
 
-fn attr_is(n: &Node, name: &str, target: &str) -> bool { 
+fn attr_is(n: &Node, name: &str, target: &str) -> bool {
     n.attribute(name).map(|a| a == target).unwrap_or(false)
 }
 
-fn get_text(n: &Node) -> String { 
+fn get_text(n: &Node) -> String {
     match n.first_child() {
         Some(node) => node.text().unwrap().to_owned(),
-        None => "".to_owned()
+        None => "".to_owned(),
     }
 }
 
@@ -218,14 +215,18 @@ fn get_child<'a, 'i>(parent: &Node<'a, 'i>, name: &str) -> Option<Node<'a, 'i>> 
 }
 
 fn get_child_text(parent: &Node, name: &str) -> Option<String> {
-    parent.children().find(|n| n.has_tag_name(name))
-                     .map(|n| get_text(&n))
+    parent
+        .children()
+        .find(|n| n.has_tag_name(name))
+        .map(|n| get_text(&n))
 }
 
 fn get_child_text_or(parent: &Node, name: &str, default: &str) -> String {
-    parent.children().find(|n| n.has_tag_name(name))
-                     .map(|n| get_text(&n))
-                     .unwrap_or(default.to_owned())
+    parent
+        .children()
+        .find(|n| n.has_tag_name(name))
+        .map(|n| get_text(&n))
+        .unwrap_or(default.to_owned())
 }
 
 
@@ -235,7 +236,7 @@ fn rev_re() -> &'static Regex {
     static REV: OnceLock<Regex> = OnceLock::new();
     REV.get_or_init(|| {
         Regex::new(r"^(\d+|HEAD|BASE|PREV|COMMITTED)([+-]\d+)?$")
-                .expect("Error parsing REV regular expression")
+            .expect("Error parsing REV regular expression")
     })
 }
 
@@ -262,19 +263,25 @@ pub fn looks_like_revision_range(text: &str) -> bool {
 //  For revisions such as HEAD it will return the actual numeric revision.
 //  For revisions that do not exist for the given path, it will return the next
 //  available revision if possible.
-fn get_revision_number(creds: &Option<Credentials>, rev: &str, delta: i32, path: &str) -> Result<String> {
+fn get_revision_number(
+    creds: &Option<Credentials>,
+    rev: &str,
+     delta: i32,
+     path: &str,
+) -> Result<String> {
     let rev_str = match delta {
         d if d <= 0 => format!("{}:0", rev),
-        _           => format!("{}:HEAD", rev),
+        _ => format!("{}:HEAD", rev),
     };
     let limit = Some(delta.unsigned_abs() + 1);
     let entries = log(creds, &[path], &[&rev_str], false, limit, false, false)?;
-    entries
-        .last()
-        .map(|log| log.revision.to_owned())
-        .ok_or(
-            General(format!("Revision cannot be resolved rev={}, delta={}, path={}", rev, delta, path)).into()
-        )
+    entries.last().map(|log| log.revision.to_owned()).ok_or(
+        General(format!(
+            "Revision cannot be resolved rev={}, delta={}, path={}",
+            rev, delta, path
+        ))
+        .into()
+    )
 }
 
 pub fn resolve_revision(creds: &Option<Credentials>, rev_string: &str, path: &str) -> Result<String> {
@@ -284,15 +291,16 @@ pub fn resolve_revision(creds: &Option<Credentials>, rev_string: &str, path: &st
     }
     match rev_re().captures(rev_string) {
         None => err(rev_string, "", path),
-        Some(caps) => {
-            match (caps.get(1), caps.get(2)) {
-                (Some(rev), None) => get_revision_number(creds, rev.as_str(), 0, path).or(err(rev.as_str(), "", path)),
-                (Some(rev), Some(delta)) => {
-                    let d = delta.as_str().parse::<i32>()?;
-                    get_revision_number(creds, rev.as_str(), d, path).or(err(rev.as_str(), delta.as_str(), path))
-               }
-               _ => unreachable!("resolve_revision_string, fell through match!")
+        Some(caps) => match (caps.get(1), caps.get(2)) {
+            (Some(rev), None) => {
+                get_revision_number(creds, rev.as_str(), 0, path).or(err(rev.as_str(), "", path))
             }
+            (Some(rev), Some(delta)) => {
+                let d = delta.as_str().parse::<i32>()?;
+                get_revision_number(creds, rev.as_str(), d, path)
+                    .or(err(rev.as_str(), delta.as_str(), path))
+            }
+            _ => unreachable!("resolve_revision_string, fell through match!")
         }
     }
 }
@@ -301,14 +309,26 @@ pub fn resolve_revision(creds: &Option<Credentials>, rev_string: &str, path: &st
 //  If the string contains a revision keyword or if it contains a delta expression
 //  then we must use svn log to get the actual revsion.
 //  In order to resovle the string using svn log we need a working copy path.
-pub fn resolve_revision_range(creds: &Option<Credentials>, rev_string: &str, path: &str) -> Result<String> {
+pub fn resolve_revision_range(
+    creds: &Option<Credentials>,
+    rev_string: &str,
+    path: &str,
+) -> Result<String> {
     let parts: Vec<&str> = rev_string.split(':').collect();
     let re = Regex::new(r"[-+]")?;
     match parts.len() {
         1 => resolve_revision(creds, parts[0], path),
         2 => {
-            let a = if re.is_match(parts[0]) {resolve_revision(creds, parts[0], path)? } else { parts[0].to_string()} ;
-            let b = if re.is_match(parts[1]) {resolve_revision(creds, parts[1], path)? } else { parts[1].to_string()} ;
+            let a = if re.is_match(parts[0]) {
+                resolve_revision(creds, parts[0], path)?
+            } else {
+                parts[0].to_string()
+            };
+            let b = if re.is_match(parts[1]) {
+                resolve_revision(creds, parts[1], path)?
+            } else {
+                parts[1].to_string()
+            };
             Ok(format!("{}:{}", a, b))
         }
         _ => {
@@ -338,33 +358,32 @@ pub fn current_branch(path: &Path) -> Result<(String, String)> {
 fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
     let mut entries: Vec<SvnInfo> = vec![];
     let doc = Document::parse(text)?;
-    for entry in doc.descendants().filter(|n| n.has_tag_name("entry")) {        
-        let (commit_rev, commit_author, commit_date) = if let Some(commit) = get_child(&entry, "commit") {
-            (
-                get_attr(&commit, "revision"),
-                get_child_text_or(&commit, "author", "n/a"),
-                parse_svn_date_opt(get_child_text(&commit, "date"))
-            )
-        }
-        else {
-            ("n/a".to_string(), "n/a".to_string(), *null_date())
-        };
-        let repo    = get_child(&entry, "repository").unwrap();
+    for entry in doc.descendants().filter(|n| n.has_tag_name("entry")) {
+        let (commit_rev, commit_author, commit_date) =
+            if let Some(commit) = get_child(&entry, "commit") {
+                (
+                    get_attr(&commit, "revision"),
+                    get_child_text_or(&commit, "author", "n/a"),
+                    parse_svn_date_opt(get_child_text(&commit, "date")),
+                )
+            } else {
+                ("n/a".to_string(), "n/a".to_string(), *null_date())
+            };
+        let repo = get_child(&entry, "repository").unwrap();
         let wc_info = get_child(&entry, "wc-info");
 
         let entry = SvnInfo {
-            path:          get_attr(&entry, "path"),
-            repo_rev:      get_attr(&entry, "revision"),
-            kind:          get_attr(&entry, "kind"),
-            size:          get_attr(&entry, "size").parse::<u64>().ok(),
-            url:           get_child_text_or(&entry, "url", "n/a"),
-            rel_url:       get_child_text_or(&entry, "relative-url", "n/a"),
-            root_url:      get_child_text_or(&repo, "root", "n/a"),
-            repo_uuid:     get_child_text_or(&repo, "uuid", "n/a"),
+            path: get_attr(&entry, "path"),
+            repo_rev: get_attr(&entry, "revision"),
+            kind: get_attr(&entry, "kind"),
+            size: get_attr(&entry, "size").parse::<u64>().ok(),
+            url: get_child_text_or(&entry, "url", "n/a"),
+            rel_url: get_child_text_or(&entry, "relative-url", "n/a"),
+            root_url: get_child_text_or(&repo, "root", "n/a"),
+            repo_uuid: get_child_text_or(&repo, "uuid", "n/a"),
             commit_rev,
             commit_author,
             commit_date,
-
             wc_path: wc_info.map(|x| get_child_text_or(&x, "wcroot-abspath", "n/a")),
         };
         entries.push(entry);
@@ -372,8 +391,11 @@ fn parse_svn_info(text: &str) -> Result<Vec<SvnInfo>> {
     Ok(entries)
 }
 
-pub fn info<'a>(creds: &Option<Credentials>, path: &'a str, revision: Option<&'a str>) -> Result<SvnInfo> {
-
+pub fn info<'a>(
+    creds: &Option<Credentials>,
+    path: &'a str,
+    revision: Option<&'a str>,
+) -> Result<SvnInfo> {
     let output = SvnCmd::new("info")
         .with_creds(creds)
         .arg("--xml")
@@ -385,28 +407,30 @@ pub fn info<'a>(creds: &Option<Credentials>, path: &'a str, revision: Option<&'a
         let text = String::from_utf8_lossy(&output.stdout);
         let info = parse_svn_info(&text)?;
         Ok(info[0].clone())
-    }
-    else {
+    } else {
         Err(SvnError(output).into())
     }
 }
 
-pub fn info_list<S>(creds: &Option<Credentials>, paths: &[S], revision: Option<S>) -> Result<Vec<SvnInfo>> 
+pub fn info_list<S>(
+    creds: &Option<Credentials>,
+    paths: &[S],
+    revision: Option<S>,
+) -> Result<Vec<SvnInfo>>
 where
-    S: AsRef<str> + Display
+    S: AsRef<str> + Display,
 {
     let output = SvnCmd::new("info")
-    .with_creds(creds)
-    .arg("--xml")
-    .opt_arg(&revision.map(|r| format!("--revision={}", r)))
-    .args(paths)
-    .run()?;
+        .with_creds(creds)
+        .arg("--xml")
+        .opt_arg(&revision.map(|r| format!("--revision={}", r)))
+        .args(paths)
+        .run()?;
 
     if output.status.success() {
         let text = String::from_utf8_lossy(&output.stdout);
         parse_svn_info(&text)
-    }
-    else {
+    } else {
         Err(SvnError(output).into())
     }
 }
@@ -425,9 +449,9 @@ fn get_log_entry_paths(log_entry: &Node) -> Vec<LogPath> {
         };
 
         let log_path = LogPath {
-            path:      get_text(&path_node),
-            kind:      get_attr(&path_node, "kind"),
-            action:    get_attr(&path_node, "action"),
+            path: get_text(&path_node),
+            kind: get_attr(&path_node, "kind"),
+            action: get_attr(&path_node, "action"),
             text_mods: attr_is(&path_node, "text-mods", "true"),
             prop_mods: attr_is(&path_node, "prop-mods", "true"),
             from_path
@@ -446,10 +470,10 @@ fn parse_svn_log(text: &str) -> Result<Vec<LogEntry>> {
 
         let entry = LogEntry {
             revision: get_attr(&log_entry, "revision"),
-            author:   get_child_text_or(&log_entry, "author", "n/a"),
-            date:     parse_svn_date_opt(get_child_text(&log_entry, "date")),
-            msg:      get_child_text_or(&log_entry, "msg", "").split('\n').map(|s| s.to_owned()).collect(),
-            paths:    get_log_entry_paths(&log_entry)
+            author: get_child_text_or(&log_entry, "author", "n/a"),
+            date: parse_svn_date_opt(get_child_text(&log_entry, "date")),
+            msg: get_child_text_or(&log_entry, "msg", "").split('\n').map(|s| s.to_owned()).collect(),
+            paths: get_log_entry_paths(&log_entry)
         };
         entries.push(entry);
     }
@@ -464,9 +488,10 @@ pub fn log<S>(
     include_msg: bool,
     limit: Option<u32>,
     stop_on_copy: bool,
-    include_paths: bool) -> Result<Vec<LogEntry>>
+    include_paths: bool,
+) -> Result<Vec<LogEntry>>
 where
-    S: AsRef<str> + Display
+    S: AsRef<str> + Display,
 {
     let output = SvnCmd::new("log")
         .with_creds(creds)
@@ -482,8 +507,7 @@ where
     if output.status.success() {
         let text = String::from_utf8_lossy(&output.stdout);
         parse_svn_log(&text)
-    }
-    else {
+    } else {
         Err(SvnError(output).into())
     }
 }
@@ -498,12 +522,13 @@ fn parse_svn_list(text: &str) -> Result<Vec<SvnList>> {
         for entry_node in list_node.children().filter(|n| n.has_tag_name("entry")) {
             let (commit_rev, commit_author, commit_date) =
                 if let Some(commit_node) = get_child(&entry_node, "commit") {
-                    (get_attr(&commit_node, "revision"),
-                    get_child_text_or(&commit_node, "author", "n/a"),
-                    parse_svn_date_opt(get_child_text(&commit_node, "date")))
+                    (
+                        get_attr(&commit_node, "revision"),
+                        get_child_text_or(&commit_node, "author", "n/a"),
+                        parse_svn_date_opt(get_child_text(&commit_node, "date")),
+                    )
 
-                }
-                else {
+                } else {
                     ("n/a".to_owned(), "n/a".to_owned(), *null_date())
                 };
             let entry = ListEntry {
@@ -524,7 +549,8 @@ fn parse_svn_list(text: &str) -> Result<Vec<SvnList>> {
 
 // Get svn list for multiple paths
 pub fn path_lists<S>(creds: &Option<Credentials>, paths: &[S]) -> Result<Vec<SvnList>>
-    where S: AsRef<str> + Display
+where
+    S: AsRef<str> + Display,
 {
     if paths.is_empty() {
         Ok(vec![])
@@ -540,10 +566,9 @@ pub fn path_lists<S>(creds: &Option<Credentials>, paths: &[S]) -> Result<Vec<Svn
         if output.status.success() {
             let text = String::from_utf8_lossy(&output.stdout);
             parse_svn_list(&text)
-        }
-        else {
+        } else {
             Err(SvnError(output).into())
-        }   
+        }
     }
 }
 
@@ -568,7 +593,7 @@ pub fn change_diff(creds: &Option<Credentials>, path: &str, commit_rev: &str) ->
     }
     else {
         Err(SvnError(output).into())
-    }   
+    }
 }
 
 fn prefixes_file() -> Result<PathBuf> {
@@ -577,11 +602,11 @@ fn prefixes_file() -> Result<PathBuf> {
 #[derive(Serialize, Deserialize)]
 pub struct Prefixes {
     #[serde(rename(serialize = "trunkPrefix", deserialize = "trunkPrefix"))]
-    pub trunk_prefix:    String,
+    pub trunk_prefix: String,
     #[serde(rename(serialize = "branchPrefixes", deserialize = "branchPrefixes"))]
     pub branch_prefixes: Vec<String>,
     #[serde(rename(serialize = "tagPrefixes", deserialize = "tagPrefixes"))]
-    pub tag_prefixes:    Vec<String>
+    pub tag_prefixes: Vec<String>
 }
 
 pub fn load_prefixes() -> Result<Prefixes> {
@@ -593,9 +618,9 @@ pub fn load_prefixes() -> Result<Prefixes> {
     } else {
         //  Return the defaults
         Ok(Prefixes {
-            trunk_prefix:    "trunk".to_string(),
+            trunk_prefix: "trunk".to_string(),
             branch_prefixes: vec!["branches".to_string()],
-            tag_prefixes:    vec!["tags".to_string()],
+            tag_prefixes: vec!["tags".to_string()],
         })
     }
 }
@@ -610,8 +635,10 @@ pub fn save_prefixes(prefixes: &Prefixes) -> Result<()> {
 //  Returns the info for the current directory or
 //  and Error if not withing a working copy.
 pub fn workingcopy_info() -> Result<SvnInfo> {
-    info(&None, ".", None)
-        .map_err(|_| General("This command must be run in a serversion working copy directory.".to_string()).into())
+    info(&None, ".", None).map_err(|_| {
+        General("This command must be run in a serversion working copy directory.".to_string())
+        .into()
+    })
 }
 
 fn parse_svn_status(text: &str) -> Result<SvnStatus> {
@@ -622,8 +649,8 @@ fn parse_svn_status(text: &str) -> Result<SvnStatus> {
             if let Some(wc_node) = get_child(&entry_node, "wc-status") {
                 let revision = get_attr(&wc_node, "revision");
                 entries.push(StatusEntry {
-                    path:         get_attr(&entry_node, "path"),
-                    item_status:  get_attr(&wc_node,    "item"),
+                    path: get_attr(&entry_node, "path"),
+                    item_status: get_attr(&wc_node,    "item"),
                     props_status: get_attr(&wc_node,    "props"),
                     revision,
                 });
@@ -631,15 +658,14 @@ fn parse_svn_status(text: &str) -> Result<SvnStatus> {
         }
         let path = get_attr(&target, "path");
         Ok(SvnStatus{ path, entries })
-    }
-    else {
+    } else {
         Err(General("Malformed svn status".to_string()).into())
     }
 }
 
 pub fn status<S>(path: S, cwd: Option<&Path>) -> Result<SvnStatus>
 where
-    S: AsRef<str> + Display
+    S: AsRef<str> + Display,
 {
     let output = SvnCmd::new("status")
         .with_cwd(cwd)
@@ -649,8 +675,7 @@ where
 
     if output.status.success() {
         let text = String::from_utf8_lossy(&output.stdout);
-        Ok(parse_svn_status(&text)?)
-    }
+        Ok(parse_svn_status(&text)?) }
     else {
         Err(SvnError(output).into())
     }
@@ -659,7 +684,7 @@ where
 pub fn add<S, T>(paths: &[S], depth: T, auto_props: bool, cwd: Option<&Path>) -> Result<()>
 where
     S: AsRef<str> + Display,
-    T: AsRef<str> + Display
+    T: AsRef<str> + Display,
 {
     let output = SvnCmd::new("add")
         .with_cwd(cwd)
@@ -670,16 +695,15 @@ where
 
     if output.status.success() {
         Ok(())
-    }
-    else {
-        Err(SvnError(output).into())        
+    } else {
+        Err(SvnError(output).into())
     }
 }
 
 pub fn revert<S, T>(paths: &[S], depth: T, remove_added: bool, cwd: Option<&Path>) -> Result<()>
 where
     S: AsRef<str> + Display,
-    T: AsRef<str> + Display
+    T: AsRef<str> + Display,
 {
     let output = SvnCmd::new("revert")
         .with_cwd(cwd)
@@ -690,9 +714,8 @@ where
 
     if output.status.success() {
         Ok(())
-    }
-    else {
-        Err(SvnError(output).into())        
+    } else {
+        Err(SvnError(output).into())
     }
 }
 
@@ -708,9 +731,8 @@ pub fn create_patch(patch_file: &Path, cwd: &Path) -> Result<()> {
         let mut writer = File::create(patch_file)?;
         writer.write_all(&output.stdout)?;
         Ok(())
-    }
-    else {
-        Err(SvnError(output).into())        
+    } else {
+        Err(SvnError(output).into())
     }
 }
 
@@ -724,9 +746,8 @@ pub fn apply_patch(patch_file: &Path, dry_run: bool, cwd: Option<&Path>) -> Resu
 
     if output.status.success() {
         Ok(output.stdout)
-    }
-    else {
-        Err(SvnError(output).into())        
+    } else {
+        Err(SvnError(output).into())
     }
 }
 
@@ -739,8 +760,7 @@ pub fn update(revision: &str, depth: &str, cwd: Option<&Path>) -> Result<Vec<u8>
 
     if output.status.success() {
         Ok(output.stdout)
-    }
-    else {
-        Err(SvnError(output).into())        
+    } else {
+        Err(SvnError(output).into())
     }
 }

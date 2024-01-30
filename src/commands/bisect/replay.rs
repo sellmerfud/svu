@@ -9,7 +9,7 @@ use std::process;
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
-)]    
+)]
 pub struct Replay {
     /// Path to log file
     #[arg(num_args = 1..=1, required = true)]
@@ -30,8 +30,7 @@ impl Replay {
     
         if cmd.status.success() {
             Ok(())
-        }
-        else {
+        } else {
             Err(General("Log replay did not finish successfully".to_string()).into())
         }
     }

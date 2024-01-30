@@ -35,24 +35,25 @@ impl Push {
 
     pub fn run(&mut self) -> Result<()> {
 
-        let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
+        let wc_info = svn::workingcopy_info()?; // Make sure we are in a working copy.
         let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
         let items = get_stash_items(&wc_root, self.args.unversioned)?;
-    
+
         if items.is_empty() {
             println!("No local changes to save");
-        }
-        else {
+        } else {
             let (branch, revision) = svn::current_branch(&wc_root)?;
-            let description = self.args.message
+            let description = self
+                .args
+                .message
                 .clone()
                 .unwrap_or(get_log_message_1st(&wc_root)?);
-    
+
             let stash_path = stash_path()?;
             let patch_name = create_patch_name();
-    
+
             svn::create_patch(&stash_path.join(patch_name.as_str()), &wc_root)?;
-            
+
             let stash = StashFileEntry {
                 branch,
                 revision,
@@ -62,7 +63,7 @@ impl Push {
                 items: items.clone(),
             };
             add_stash_entry(&stash)?;
-    
+
             if !self.args.no_revert {
                 // Lastly we revert the working copy.
                 // We will explicitly revert all entries to ensure that the --remove-added flag is honored.
@@ -74,7 +75,9 @@ impl Push {
                     .cloned()
                     .collect();
                 let can_skip = |i: &StashItem| -> bool {
-                    added_unversioned.iter().any(|p| i.path.starts_with(&p.path) && i.path != p.path)
+                    added_unversioned
+                        .iter()
+                        .any(|p| i.path.starts_with(&p.path) && i.path != p.path)
                 };
                 let revert_paths: Vec<String> = items
                     .iter()
@@ -83,7 +86,7 @@ impl Push {
                     .collect();
                 svn::revert(&revert_paths, "infinity", true, Some(&wc_root))?;
             }
-    
+
             println!("Saved working copy state - {}", stash.summary_display());
         }
         Ok(())
@@ -92,9 +95,16 @@ impl Push {
 
 
 fn get_log_message_1st(wc_root: &Path) -> Result<String> {
-    let log = svn::log(&None, &[wc_root.to_string_lossy()], &["BASE:0".into()], true, Some(1), false, false)?;
+    let log = svn::log(
+        &None,
+        &[wc_root.to_string_lossy()],
+        &["BASE:0".into()],
+        true, Some(1),
+        false,
+        false
+    )?;
     Ok(log[0].msg_1st())
-  }
+}
 
 fn create_patch_name() -> String {
     format!("{}.patch", Uuid::new_v4())

@@ -13,7 +13,7 @@ use pathdiff::diff_paths;
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
-)]    
+)]
 pub struct Show {
     /// Show the patch output but do not update the working copy
     /// or remove the stash entry
@@ -27,20 +27,32 @@ pub struct Show {
 
 impl Show {
     pub fn run(&mut self) -> Result<()> {
-    
-        let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
+
+        let wc_info = svn::workingcopy_info()?; // Make sure we are in a working copy.
         let stash_entries = load_stash_entries()?;
-    
+
         if self.stash_id < stash_entries.len() {
-            let cwd        = current_dir()?;
-            let wc_root    = PathBuf::from(wc_info.wc_path.unwrap());
-            let stash      = &stash_entries[self.stash_id];
+            let cwd = current_dir()?;
+            let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
+            let stash = &stash_entries[self.stash_id];
             let patch_file = stash_path()?.join(stash.patch_name.as_str());
-            let rel_patch  = diff_paths(&patch_file, &cwd).unwrap();
-    
-            println!("{:<11}| {}", stash_id_display(self.stash_id), stash.summary_display());
-            println!("{:<11}| {}", "created", display_svn_datetime(&stash.date).magenta());
-            println!("{:<11}| {}", "patch file", rel_patch.to_string_lossy().blue());
+            let rel_patch = diff_paths(&patch_file, &cwd).unwrap();
+
+            println!(
+                "{:<11}| {}",
+                stash_id_display(self.stash_id),
+                stash.summary_display()
+            );
+            println!(
+                "{:<11}| {}",
+                "created",
+                display_svn_datetime(&stash.date).magenta()
+            );
+            println!(
+                "{:<11}| {}",
+                "patch file",
+                rel_patch.to_string_lossy().blue()
+            );
             println!("{:->70}", "-");
             for item in &stash.items {
                 let mut pathname = item.path.clone();
@@ -51,16 +63,21 @@ impl Show {
                 let path = Path::new(pathname.as_str());
                 // First create the full path to the item relative to the working copy root.
                 // Then make that relative to the current working directory.
-                let rel_path  = diff_paths(&wc_root.join(path), &cwd).unwrap();
-                let revision  = match item.status.as_str() {
+                let rel_path = diff_paths(&wc_root.join(path), &cwd).unwrap();
+                let revision = match item.status.as_str() {
                     UNVERSIONED => "unversioned",
-                    ADDED       => "new",
-                    _           => item.revision.as_str()
+                    ADDED => "new",
+                    _ => item.revision.as_str(),
                 };
                 let color = item.status_color();
-                println!("{} {} [{}]", item.status_letter().color(color), rel_path.to_string_lossy().color(color), revision.yellow())
+                println!(
+                    "{} {} [{}]",
+                    item.status_letter().color(color),
+                    rel_path.to_string_lossy().color(color),
+                    revision.yellow()
+                );
             }
-    
+
             if self.show_diff {
                 println!();
                 let file = File::open(patch_file)?;
@@ -68,11 +85,13 @@ impl Show {
                     print_diff_line(line?.as_str());
                 }
             }
-    
+
             Ok(())
-        }
-        else {
-            let msg = format!("{} does not exist in the stash", stash_id_display(self.stash_id));
+        } else {
+            let msg = format!(
+                "{} does not exist in the stash",
+                stash_id_display(self.stash_id)
+            );
             Err(General(msg).into())
         }
     }

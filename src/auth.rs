@@ -13,7 +13,7 @@ pub struct Credentials(pub String, pub String);   // username and password
 //  we do the following in order:
 //  First, if the SVU_USERNAME and SVU_PASSWORD environment variables are set
 //  then we use those values for authentication.
-//  
+//
 //  If that is not the case then we attempt to access the repository without
 //  to see if authentication is necessary.  If this access if it succeeds
 //  then authentication not is needed.  Either the repo does not require it or
@@ -22,8 +22,7 @@ pub struct Credentials(pub String, pub String);   // username and password
 //  Finally, if authentication is needed, we prompt the user for their credentials.
 
 
-pub fn get_credentials() -> Result<Option<Credentials>> 
-{
+pub fn get_credentials() -> Result<Option<Credentials>> {
     let wc_info = svn::workingcopy_info()?;  // Ensure we are in working copy directory
     let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
 
@@ -34,34 +33,40 @@ pub fn get_credentials() -> Result<Option<Credentials>>
         (Some(u), Some(p)) => {
             if access_repo(Some(Credentials(u.clone(), p.clone())), &wc_root)? {
                 Ok(Some(Credentials(u, p)))
-            }
-            else {
+            } else {
                 Err(General("Not a valid SVU_USERNAME/SVU_PASSWORD.".to_string()).into())
             }
         }
-        (None, Some(_)) => Err(General("SVU_USERNAME enviromnet variable must be set if using SVU_PASSWORD".to_string()).into()),
+        (None, Some(_)) => {
+            Err(General(
+                "SVU_USERNAME enviromnet variable must be set if using SVU_PASSWORD".to_string()
+            )
+            .into())
+        }
         _ => {
 
             //  First attempt to access the repo without credentials
             if access_repo(None,&wc_root)? {
                 Ok(None)  // No credentials needed
-            }
-            else {
+            } else {
                 //  Prompt for username and password.
                 let mut username: Option<String> = None;
                 let mut password: Option<String> = None;
 
                 while username.is_none() && password.is_none() {
                     let u = prompt_for_username()?;
-                    if u.is_empty() { continue }
+                    if u.is_empty() {
+                        continue;
+                    }
                     let p = prompt_for_password()?;
-                    if p.is_empty() { continue }
+                    if p.is_empty() {
+                        continue;
+                    }
 
                     if access_repo(Some(Credentials(u.clone(), p.clone())), &wc_root)? {
                         username = Some(u);
                         password = Some(p);
-                    }
-                    else {
+                    } else {
                         return Err(General("Not a valid username/password.".to_string()).into())
                     }
                 }
@@ -82,8 +87,7 @@ fn access_repo(credentials: Option<Credentials>, wc_root: &Path) -> Result<bool>
 
     if output.status.success() {
         Ok(true)
-    }
-    else {
+    } else {
         let text = String::from_utf8_lossy(&output.stderr);
         if text.contains("Authentication failed") {
             Ok(false)

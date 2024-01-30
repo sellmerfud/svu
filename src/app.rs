@@ -1,5 +1,4 @@
 
-// use anyhow::Result;
 use clap::Parser;
 use anyhow::Result;
 
@@ -17,7 +16,7 @@ pub(crate) const HELP_TEMPLATE: &str = "\
 
 
 pub trait Run {
-    fn run(& mut self) -> Result<()>;
+    fn run(&mut self) -> Result<()>;
 }
 
 /// Subversion utilities
@@ -42,7 +41,7 @@ pub enum Commands {
     Ignore(ignore::Ignore),
 }
 
- use Commands::*;
+use Commands::*;
 
 impl Run for Commands{
     fn run(&mut self) -> Result<()> {

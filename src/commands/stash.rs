@@ -79,10 +79,9 @@ impl Stash {
 fn parse_stash_id(arg: &str) -> Result<usize> {
     let re = Regex::new(r"^(?:stash-)?(\d+)$")?;
     if let Some(captures) = re.captures(arg) {
-        let id = captures .get(1).unwrap() .as_str().parse::<usize>()?;
+        let id = captures.get(1).unwrap().as_str().parse::<usize>()?;
         Ok(id)
-    }
-    else {
+    } else {
         Err(General("Stash id must be 'stash-<n>' or '<n>'".to_string()).into())
     }
 }
@@ -90,7 +89,6 @@ fn parse_stash_id(arg: &str) -> Result<usize> {
 fn stash_id_display(id: usize) -> String {
     format!("stash-{}", id)
 }
-
 
 // Common structures and functions used by all of the stash commands.
 
@@ -121,11 +119,11 @@ const MODIFIED:    &str = "modified";
 // status will be one of: deleted, modified, added, unversioned
 #[derive(Clone, Debug, Serialize, Deserialize)]
   struct StashItem {
-    path:     String,
+    path: String,
     revision: String,
-    status:   String,
+    status: String,
     #[serde(rename(serialize = "isDir", deserialize = "isDir"))]
-    is_dir:   bool,
+    is_dir: bool,
 }
 
 impl StashItem {
@@ -154,19 +152,24 @@ use crate::util::datetime_serializer;
 //  Stash entries saved to .sv/stash/stash_entries.json
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct StashFileEntry {
-    branch:      String,
-    revision:    String,
+    branch: String,
+    revision: String,
     description: String,
     #[serde(with = "datetime_serializer")]
-    date:        DateTime<Local>,
+    date: DateTime<Local>,
     #[serde(rename(serialize = "patchName", deserialize = "patchName"))]
-    patch_name:  String,
-    items:       Vec<StashItem>,
+    patch_name: String,
+    items: Vec<StashItem>,
 }
 
 impl StashFileEntry {
     fn summary_display(&self) -> String {
-        format!("{} [{}]: {}", self.branch.green(), self.revision.yellow(), self.description)
+        format!(
+            "{} [{}]: {}",
+            self.branch.green(),
+            self.revision.yellow(),
+            self.description
+        )
     }
 
 }
@@ -178,11 +181,9 @@ fn load_stash_entries() -> Result<Vec<StashFileEntry>> {
         let entries: Vec<StashFileEntry> = serde_json::from_reader(reader)?;
         Ok(entries)
     } else {
-
         Ok(vec![])
     }
 }
-
 
 fn add_stash_entry(stash: &StashFileEntry) -> Result<()> {
     let mut entries = load_stash_entries()?;
@@ -197,7 +198,6 @@ fn save_stash_entries(entries: &[StashFileEntry]) -> Result<()> {
     Ok(serde_json::to_writer_pretty(writer, entries)?)
 }
 
-
 //  Runs `svn status` on the working copy root directory
 //  If we are not including unversioned items then we filter them out and build the list
 //
@@ -210,7 +210,6 @@ fn save_stash_entries(entries: &[StashFileEntry]) -> Result<()> {
 //  "added" so we must mark them as unversioned in our own item list.
 //  So this function will alter the working copy when unversioned items are being stashed.
 fn get_stash_items(wc_root: &Path, unversioned: bool) -> Result<Vec<StashItem>> {
-
     fn get_wc_items(wc_root: &Path, unversioned: bool) -> Result<Vec<StashItem>> {
         let status = svn::status(".", Some(wc_root))?;
         let mut items = Vec::<StashItem>::new();
@@ -219,31 +218,33 @@ fn get_stash_items(wc_root: &Path, unversioned: bool) -> Result<Vec<StashItem>> 
             if entry.item_status != NORMAL && (unversioned || entry.item_status != UNVERSIONED) {
                 let is_dir = wc_root.join(&entry.path).is_dir();
                 items.push(StashItem {
-                    path:     entry.path,
+                    path: entry.path,
                     revision: entry.revision,
-                    status:   entry.item_status,
-                    is_dir
+                    status: entry.item_status,
+                    is_dir,
                 });
             }
         }
         Ok(items)
     }
 
-    fn fixup_unversioned_items<'a>(initial_items: &'a Vec<StashItem>, wc_root: &Path) -> Result<Cow<'a, Vec<StashItem>>> {
+    fn fixup_unversioned_items<'a>(
+        initial_items: &'a Vec<StashItem>,
+        wc_root: &Path
+    ) -> Result<Cow<'a, Vec<StashItem>>> {
         let unversioned_paths: Vec<String> = initial_items
             .iter()
             .filter(|i| i.status == UNVERSIONED)
             .map(|i| i.path.clone())
             .collect();
-        
+
         if unversioned_paths.is_empty() {
             Ok(Cow::Borrowed(initial_items))
-        }
-        else {
+        } else {
             //  Any files inside of unversioned directories will not have been included when we
             //  ran `svn status``. So We run `svn add`` to recursively add all of the unversioned
-            //  files/directories to the working copy.            
-            //  If we had unversioned directories then we will need to fixup the status of the files/directories 
+            //  files/directories to the working copy.
+            //  If we had unversioned directories then we will need to fixup the status of the files/directories
             //  that we just added.  We do this by running `svn status` again so that it picks up all of the
             //  new items.  But the unversioned items will now have a status of "added" so we must set those
             //  status values back to "unversioned" so we can restore the properly when the stash is reapplied.
@@ -251,22 +252,25 @@ fn get_stash_items(wc_root: &Path, unversioned: bool) -> Result<Vec<StashItem>> 
 
             svn::add(&unversioned_paths, "infinity", false, Some(wc_root))?;
 
-            if initial_items.iter().any(|i| i.is_dir && i.status == UNVERSIONED) {
-
+            if initial_items
+                .iter()
+                .any(|i| i.is_dir && i.status == UNVERSIONED)
+            {
                 let new_items = get_wc_items(wc_root, false)?;
                 let mut fixed_items = Vec::<StashItem>::new();
                 for item in new_items {
-                    if item.status == ADDED &&
-                       unversioned_paths.iter().any(|p| item.path.starts_with(p.as_str())) {
+                    if item.status == ADDED
+                        && unversioned_paths
+                            .iter()
+                            .any(|p| item.path.starts_with(p.as_str()))
+                    {
                         fixed_items.push(StashItem { status: UNVERSIONED.to_string(), ..item});
-                    }
-                    else {
+                    } else {
                         fixed_items.push(item)
                     }
                 }
-                Ok(Cow::Owned(fixed_items) )
-            }
-            else {
+                Ok(Cow::Owned(fixed_items))
+            } else {
                 Ok(Cow::Borrowed(initial_items))
             }
         }
@@ -274,7 +278,7 @@ fn get_stash_items(wc_root: &Path, unversioned: bool) -> Result<Vec<StashItem>> 
 
     match get_wc_items(wc_root, unversioned)? {
         items if unversioned => Ok(fixup_unversioned_items(&items, wc_root)?.into_owned()),
-        items => Ok(items)
+        items => Ok(items),
     }
 }
 
@@ -294,9 +298,10 @@ fn apply_stash(stash: &StashFileEntry, wc_root: &Path, dry_run: bool) -> Result<
             let path   = &captures[3];
             let rel_path = match status {
                 ">" => path.to_string(), // Not a path
-                _   => {
-                    diff_paths(&wc_root.join(path), &cwd).unwrap().to_string_lossy().to_string()
-                }
+                _   => diff_paths(&wc_root.join(path), &cwd)
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string(),
             };
             let color = match status {
                 "C" => "red",
@@ -308,33 +313,47 @@ fn apply_stash(stash: &StashFileEntry, wc_root: &Path, dry_run: bool) -> Result<
             let new_line = format!("{}{}{}", status, space, rel_path);
             println!("{}", new_line.color(color));
             last_status = status.to_string();
-        }
-        else {
+        } else {
             println!("{}", line);
         }
     }
 
     if !dry_run {
-      // The working copy has been restored via the patch, but and files that were
-      // `unversioned`` when the stash was created will not appear as `added``.
-      // We must run `svn revert` on each unversioned item so that it will
-      // once again become unversioned.
-        let unversioned: Vec<StashItem> = stash.items.
+        // The working copy has been restored via the patch, but and files that were
+        // `unversioned`` when the stash was created will not appear as `added``.
+        // We must run `svn revert` on each unversioned item so that it will
+        // once again become unversioned.
+        let unversioned: Vec<StashItem> = stash
+            .items.
             iter()
-            .filter_map(|i| if i.status == UNVERSIONED { Some(i.clone()) } else { None })
+            .filter_map(|i| {
+                if i.status == UNVERSIONED {
+                    Some(i.clone())
+                } else {
+                    None
+                }
+            })
             .collect();
 
         if !unversioned.is_empty() {
             let unversioned_dirs: Vec<String> = unversioned
                 .iter()
-                .filter_map(|i| if i.is_dir { Some(i.path.clone()) } else { None} )
+                .filter_map(|i| if i.is_dir { Some(i.path.clone()) } else { None})
                 .collect();
             let can_skip = |i: &StashItem| -> bool {
-                unversioned_dirs.iter().any(|d| i.path.starts_with(d)  && i.path != *d)
+                unversioned_dirs
+                    .iter()
+                    .any(|d| i.path.starts_with(d)  && i.path != *d)
             };
             let revert_paths: Vec<String> = unversioned
                 .iter()
-                .filter_map(|i| if can_skip(i) { None } else { Some(i.path.clone()) })
+                .filter_map(|i| {
+                    if can_skip(i) {
+                        None
+                    } else {
+                        Some(i.path.clone())
+                    }
+                })
                 .collect();
             svn::revert(&revert_paths, "infinity", false, Some(wc_root))?;
         }

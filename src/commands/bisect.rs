@@ -75,17 +75,17 @@ impl Bisect {
 
 
 fn parse_term(arg: &str) -> Result<String> {
-    let commands = HashSet::from(
-        [ "start", "bad", "good", "terms", "skip", "unskip", "log", "run", "replay", "reset" ]
-    );
+    let commands = HashSet::from([
+        "start", "bad", "good", "terms", "skip", "unskip", "log", "run", "replay", "reset"
+    ]);
     let re = Regex::new(r"^[A-Za-z][-_A-Za-z]*$").unwrap();
     if !re.is_match(arg)  {
-        Err(General("Term must start with a letter and contain only letters, '-', or '_'".to_string()).into())
-    }
-    else if commands.contains(arg) {
+        Err(General(
+            "Term must start with a letter and contain only letters, '-', or '_'".to_string()
+        ).into())
+    } else if commands.contains(arg) {
         Err(General("Term cannot mask another bisect command".to_string()).into())
-    }
-    else {
+    } else {
         Ok(arg.to_string())
     }
 }
@@ -95,36 +95,34 @@ fn parse_term(arg: &str) -> Result<String> {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct BisectData {
-    #[serde(rename(serialize = "localPath", deserialize = "localPath"))]
-    local_path:   String,   // No longer used!
     #[serde(rename(serialize = "originalRev", deserialize = "originalRev"))]
     original_rev: String,
     #[serde(rename(serialize = "headRev", deserialize = "headRev"))]
-    head_rev:     Option<String>,
+    head_rev: Option<String>,
     #[serde(rename(serialize = "firstRev", deserialize = "firstRev"))]
-    first_rev:    Option<String>,
+    first_rev: Option<String>,
     #[serde(rename(serialize = "maxRev", deserialize = "maxRev"))]
-    max_rev:      Option<String>,
+    max_rev: Option<String>,
     #[serde(rename(serialize = "minRev", deserialize = "minRev"))]
-    min_rev:      Option<String>,
-    skipped:      HashSet<String>,
+    min_rev: Option<String>,
+    skipped: HashSet<String>,
     #[serde(rename(serialize = "termGood", deserialize = "termGood"))]
-    term_good:    Option<String>,
+    term_good: Option<String>,
     #[serde(rename(serialize = "termBad", deserialize = "termBad"))]
-    term_bad:     Option<String>,
+    term_bad: Option<String>,
 }
 
 impl BisectData {
     fn good_name(&self) -> &str {
-        // bad::Bad.name()
-        self.term_good.as_ref()
+        self.term_good
+            .as_ref()
             .map(|s| s.as_ref())
             .unwrap_or("good")
     }
 
     fn bad_name(&self) -> &str {
-        // bad::Bad.name()
-        self.term_bad.as_ref()
+        self.term_bad
+            .as_ref()
             .map(|s| s.as_ref())
             .unwrap_or("bad")
     }
@@ -163,12 +161,15 @@ fn save_bisect_data(data: &BisectData) -> Result<()> {
 //  Load and return the bisect data or return a Generaal
 //  error if the data file is missing.
 fn get_bisect_data() -> Result<BisectData> {
-    load_bisect_data()?
-        .ok_or(General("You must first start a bisect session with the 'bisect start' subcommand.".to_string()).into())
+    load_bisect_data()?.ok_or(
+        General(
+            "You must first start a bisect session with the 'bisect start' subcommand.".to_string()
+        ).into())
 }
 
-fn append_to_log<S>(msg: S) -> Result<()> 
-    where S: AsRef<str> + Display
+fn append_to_log<S>(msg: S) -> Result<()>
+where
+    S: AsRef<str> + Display
 {
     let mut writer = OpenOptions::new()
         .append(true)
@@ -190,14 +191,30 @@ fn display_log() -> Result<()> {
 }
 
 fn get_1st_log_message(revision: &str) -> Result<String> {
-    let logs = svn::log(&None, &[], &[revision.to_string()], true, Some(1), false,false)?;
-    let msg = if let Some(log) = logs.first() { log.msg_1st() }
-    else { "".to_string() };
+    let logs = svn::log(
+        &None,
+        &[],
+        &[revision.to_string()],
+        true,
+        Some(1),
+        false,
+        false
+    )?;
+    let msg = if let Some(log) = logs.first() {
+        log.msg_1st()
+    } else {
+        "".to_string()
+    };
     Ok(msg)
 }
 
 fn log_bisect_revision(revision: &str, term: &str) -> Result<()> {
-    let line = format!("# {}: [{}] {}", term, revision, get_1st_log_message(revision)?);
+    let line = format!(
+        "# {}: [{}] {}",
+        term,
+        revision,
+        get_1st_log_message(revision)?
+    );
     append_to_log(line)
 }
 
@@ -214,24 +231,28 @@ fn to_rev_num(rev: &str) -> usize {
 }
 
 fn get_workingcopy_bounds() -> Result<(String, String)> {
-    let first = svn::log(&None, &[], &["HEAD:0"], true, Some(1), false,false)?
+    let first = svn::log(&None, &[], &["HEAD:0"], true, Some(1), false, false)?
         .first()
         .unwrap()
         .revision
         .clone();
-    let last = svn::log(&None, &[], &["0:HEAD"], true, Some(1), false,false)?
+    let last = svn::log(&None, &[], &["0:HEAD"], true, Some(1), false, false)?
         .first()
         .unwrap()
         .revision
         .clone();
-    
+
     Ok((first.clone(), last.clone()))
 }
 
 fn get_extant_revisions(rev1: &str, rev2: &str) -> Result<Vec<String>> {
     let mut revisions = Vec::new();
     let range = format!("{}:{}", rev1, rev2);
-    println!("Fetching history from revisions {} to {}", rev1.yellow(), rev2.yellow());
+    println!(
+        "Fetching history from revisions {} to {}",
+        rev1.yellow(),
+        rev2.yellow()
+    );
     let logs = svn::log(&None, &[], &[range], false, None, false, false)?;
     for log in &logs {
         revisions.push(log.revision.clone());
@@ -258,16 +279,22 @@ fn get_log_entry(revision: &str, with_paths: bool) -> Result<Option<LogEntry>> {
 
 fn perform_bisect(data: &BisectData) -> Result<bool> {
     if !data.is_ready() {
-        return Err(General("fatal: peform_bisect() called when data not ready".to_string()).into())
+        return Err(General("fatal: peform_bisect() called when data not ready".to_string()).into());
     }
 
     let max_rev = data.max_rev.as_ref().unwrap();
     let min_rev = data.min_rev.as_ref().unwrap();
     let extant_revs = get_extant_revisions(max_rev, min_rev)?;
-    let candidate_revs = &extant_revs[1..extant_revs.len()-1];
+    let candidate_revs = &extant_revs[1..extant_revs.len() - 1];
     let non_skipped_revs: Vec<String> = candidate_revs
         .iter()
-        .filter_map(|r| if data.skipped.contains(r) { None } else { Some(r.clone()) })
+        .filter_map(|r| {
+            if data.skipped.contains(r) {
+                None
+            } else {
+                Some(r.clone())
+            }
+        })
         .collect();
 
     if non_skipped_revs.is_empty() {
@@ -292,13 +319,13 @@ fn perform_bisect(data: &BisectData) -> Result<bool> {
         let num = non_skipped_revs.len();
         let steps = match (f64::log10(num as f64) / f64::log10(2.0)) as usize {
             1 => "1 step".to_string(),
-            n => format!("{} steps", n)
+            n => format!("{} steps", n),
         };
         let next_rev = &non_skipped_revs[non_skipped_revs.len() / 2];
 
         println!("Bisecting: {} revisions left to test after this (roughly {}) ", num, steps);
         update_workingcopy(next_rev)?;
-        Ok(false)    
+        Ok(false)
     }
 }
 
@@ -348,8 +375,7 @@ fn mark_bad_revision(revision: &str) -> Result<bool> {
 //  Returns true if the perform_bisect() reports that the session is complete
 fn mark_skipped_revisions(incoming_skipped: &HashSet<String>) -> Result<bool> {
     let mut data = get_bisect_data()?;
-    let mut new_skipped: Vec<String> =
-        incoming_skipped
+    let mut new_skipped: Vec<String> = incoming_skipped
         .difference(&data.skipped)
         .cloned()
         .collect();
@@ -357,11 +383,10 @@ fn mark_skipped_revisions(incoming_skipped: &HashSet<String>) -> Result<bool> {
     if new_skipped.is_empty() {
         Ok(false)
     } else {
-        let skipped: HashSet<String> =
-            data.skipped
+        let skipped: HashSet<String> = data.skipped
             .union(incoming_skipped)
             .cloned()
-            .collect();       
+            .collect();
         data = BisectData { skipped, ..data };
         save_bisect_data(&data)?;
         new_skipped.sort_by(|a, b| b.cmp(a)); // Sorted most recent first
@@ -371,8 +396,7 @@ fn mark_skipped_revisions(incoming_skipped: &HashSet<String>) -> Result<bool> {
 
         if data.is_ready() {
             perform_bisect(&data)
-        }
-        else {
+        } else {
             Ok(false)
         }
     }
@@ -381,8 +405,7 @@ fn mark_skipped_revisions(incoming_skipped: &HashSet<String>) -> Result<bool> {
 //  Returns true if the perform_bisect() reports that the session is complete
 fn mark_unskipped_revisions(incoming_unskipped: &HashSet<String>) -> Result<bool> {
     let mut data = get_bisect_data()?;
-    let mut new_unskipped: Vec<String> =
-        incoming_unskipped
+    let mut new_unskipped: Vec<String> = incoming_unskipped
         .intersection(&data.skipped)
         .cloned()
         .collect();
@@ -390,11 +413,10 @@ fn mark_unskipped_revisions(incoming_unskipped: &HashSet<String>) -> Result<bool
     if new_unskipped.is_empty() {
         Ok(false)
     } else {
-        let skipped: HashSet<String> =
-            data.skipped
+        let skipped: HashSet<String> = data.skipped
             .difference(incoming_unskipped)
             .cloned()
-            .collect();       
+            .collect();
         data = BisectData { skipped, ..data };
         save_bisect_data(&data)?;
         new_unskipped.sort_by(|a, b| b.cmp(a)); // Sorted most recent first
@@ -404,8 +426,7 @@ fn mark_unskipped_revisions(incoming_unskipped: &HashSet<String>) -> Result<bool
 
         if data.is_ready() {
             perform_bisect(&data)
-        }
-        else {
+        } else {
             Ok(false)
         }
     }
@@ -416,15 +437,18 @@ fn mark_unskipped_revisions(incoming_unskipped: &HashSet<String>) -> Result<bool
 //  These value should be resovlved to be well formed (see: resolved_revision_range())
 //  This function gathers the actual revision numbers that lie within each range
 //  for the given path.
-fn gather_revisions(creds: &Option<Credentials>, rev_str: &str, path: &str) -> Result<HashSet<String>> {
+fn gather_revisions(
+    creds: &Option<Credentials>,
+    rev_str: &str,
+     path: &str,
+) -> Result<HashSet<String>> {
     let mut revisions = HashSet::new();
 
     if rev_str.contains(':') {
         let resolved = svn::resolve_revision_range(creds, rev_str, path)?;
         let entries = svn::log(&None, &[path], &[&resolved], false, None, false, false)?;
         revisions.extend(entries.iter().map(|e| e.revision.clone()));
-    }
-    else {
+    } else {
         revisions.insert(svn::resolve_revision(creds, rev_str, path)?);
     }
 

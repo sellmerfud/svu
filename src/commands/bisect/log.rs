@@ -8,7 +8,7 @@ use anyhow::Result;
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
-)]    
+)]
 pub struct Log;
 
 impl Log {

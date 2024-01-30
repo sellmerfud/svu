@@ -17,7 +17,10 @@ pub enum SvError {
 }
 
 pub fn join_paths<S, T>(base: S, leaf: T) -> String
-    where S: AsRef<str>, T: AsRef<str> {
+where
+S: AsRef<str>,
+T: AsRef<str>,
+{
     let mut path = String::new();
 
     path += base.as_ref().trim_end_matches('/');
@@ -30,7 +33,7 @@ pub fn join_paths<S, T>(base: S, leaf: T) -> String
 //  This gives sv commands a place to store data
 //  This will throw an error of the directory cannot be resloved.
 pub fn data_directory() -> Result<PathBuf> {
-    let wc_info = svn::workingcopy_info()?;  // Make sure we are in a working copy.
+    let wc_info = svn::workingcopy_info()?; // Make sure we are in a working copy.
     let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
     let path = wc_root.join(".sv");
     if !path.is_dir() {
@@ -47,11 +50,17 @@ pub fn formatted_log_path(log_path: &LogPath) -> String {
         _    => "white"
     };
 
-    let base = format!("  {} {}", log_path.action.color(color), log_path.path.color(color));
+    let base = format!(
+        "  {} {}",
+        log_path.action.color(color),
+        log_path.path.color(color),
+    );
 
     match &log_path.from_path {
-        Some(FromPath { path, revision }) => format!("{} (from {} {})", base, path.magenta(), revision.yellow()),
-        None                              => base
+        Some(FromPath { path, revision }) => {
+            format!("{} (from {} {})", base, path.magenta(), revision.yellow())
+        }
+        None => base
     }
 }
 
@@ -69,8 +78,8 @@ pub fn null_date() -> &'static DateTime<Local> {
 
 pub fn parse_svn_date(date_str: &str) -> DateTime<Local> {
     DateTime::parse_from_rfc3339(date_str)
-    .unwrap()  // We assume all svn dates are well formed!
-    .with_timezone(&Local)
+        .unwrap()  // We assume all svn dates are well formed!
+        .with_timezone(&Local)
 }
 
 pub fn svn_date_to_rfc3339_string(date: &DateTime<Local>) -> String {
@@ -109,15 +118,22 @@ pub(crate) mod datetime_serializer {
 
     use super::{svn_date_to_rfc3339_string, parse_svn_date};
 
-    pub fn serialize<S>(date: &DateTime<Local>, serializer: S) -> core::result::Result<S::Ok, S::Error>
-        where S: Serializer
+    pub fn serialize<S>(
+        date: &DateTime<Local>,
+        serializer: S,
+    ) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
     {
         let s = svn_date_to_rfc3339_string(date);
         serializer.serialize_str(&s)
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> core::result::Result<DateTime<Local>, D::Error>
-        where D: Deserializer<'de>
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> core::result::Result<DateTime<Local>, D::Error>
+    where
+        D: Deserializer<'de>
     {
         let s = String::deserialize(deserializer)?;
         Ok(parse_svn_date(&s))
@@ -141,14 +157,24 @@ pub fn show_commit(log_entry: &LogEntry, show_msg: bool, show_paths: bool) {
     if show_msg {
         for line in &log_entry.msg {
             println!(" {}", line);
-        }  
+        }
     }
     println!();
 
     if !log_entry.paths.is_empty() {
-        struct Totals{ pub chg: u16, pub add:u16, pub del:u16, pub rep:u16 }
-        let mut totals = Totals { chg: 0, add: 0, del: 0, rep: 0};
-        
+        struct Totals{
+            chg: u16,
+            add: u16,
+            del: u16,
+            rep: u16,
+        }
+        let mut totals = Totals {
+            chg: 0,
+            add: 0,
+            del: 0,
+            rep: 0,
+        };
+
         for path_entry in &log_entry.paths {
             match path_entry.action.as_str() {
                 "M" => totals.chg += 1,
@@ -159,14 +185,16 @@ pub fn show_commit(log_entry: &LogEntry, show_msg: bool, show_paths: bool) {
             }
         }
         let label = if totals.chg == 1 { "file" } else { "files" };
-        let tot_line = format!("{} {} modified, {} added, {} deleted, {} replaced",
-            totals.chg, label, totals.add, totals.del, totals.rep);
+        let tot_line = format!(
+            "{} {} modified, {} added, {} deleted, {} replaced",
+            totals.chg, label, totals.add, totals.del, totals.rep
+        );
         println!("{}", tot_line.cyan());
     }
 
     if show_paths {
         for path in &log_entry.paths {
-            println!("{}", formatted_log_path(path))           
+            println!("{}", formatted_log_path(path))
         }
     }
 }
