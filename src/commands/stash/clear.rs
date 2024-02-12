@@ -5,7 +5,7 @@ use crate::svn;
 use super::*;
 use std::fs::remove_file;
 
-/// Remove all stash entries
+/// Remove all stash entries.
 #[derive(Debug, Parser)]
 #[command(
     author,

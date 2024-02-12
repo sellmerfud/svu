@@ -5,40 +5,45 @@ use crate::{svn, util};
 use crate::util::SvError::*;
 
 
-/// Display and configure repository prefixes
+/// Display and configure repository prefixes.
+/// 
+/// The `branch` and `filerevs` subcommands depend on prefixes to know where the
+/// branches and tags are located in your repository.  By default it is assumed that they
+/// are located in the standard locations (^/trunk, ^/branches, ^/tags).  If you are using a
+/// non-standard configuration or if you have multiple locations containing branches and/or tags
+/// then you can use `branch prefix` to let svu know where to find them.
+/// 
+/// For example you may keep older branches in ^/obsolete-branches in order to keep your
+/// ^/branches location less cluttered.
+/// 
+/// All prefixes must start with '^/'
 #[derive(Debug, Parser)]
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
     after_help = "\
-    By default it is assumed that your repository is using the defacto prefixes:\n\
-    ^/trunk\n\
-    ^/branches\n\
-    ^/tags\n\
-    \n\
-    You can use this command to configure other prefixes so that the `branch` and\n\
-    `filerevs` commands can find them.\n\
-    \n\
-    All prefixes must start with '^/'"
+    By default svu assumes that your repository is using the defacto prefixes (^/trunk, ^/branches/ ^/tags). \n\
+    You can use this command to configure other prefixes so that the `branch` and `filerevs` commands can find them.\n\
+    type `svu prefix --help` for more information."
 )]
 pub struct Prefix {
-    /// Add a branch prefix
+    /// Add a branch prefix.
     #[arg(long, value_name = "PREFIX", value_parser = parse_prefix)]
     add_branch: Vec<String>,
 
-    /// Remove a branch prefix
+    /// Remove a branch prefix.
     #[arg(long, value_name = "PREFIX", value_parser = parse_prefix)]
     rem_branch: Vec<String>,
 
-    /// Add a tag prefix
+    /// Add a tag prefix.
     #[arg(long, value_name = "PREFIX", value_parser = parse_prefix)]
     add_tag: Vec<String>,
 
-    /// Remove a tag prefix
+    /// Remove a tag prefix.
     #[arg(long, value_name = "PREFIX", value_parser = parse_prefix)]
     rem_tag: Vec<String>,
 
-    /// Set the trunk prefix
+    /// Set the trunk prefix.
     #[arg(long, value_name = "PREFIX", value_parser = parse_prefix)]
     set_trunk: Option<String>,
 }

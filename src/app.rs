@@ -20,9 +20,12 @@ pub trait Run {
 }
 
 /// Subversion utilities
+///
+/// A collection of useful commands for working with Subversion repositories.
 #[derive(Debug, Parser)]
 #[command(
     about,
+    long_about,
     author,
     help_template = HELP_TEMPLATE,
     propagate_version = true,

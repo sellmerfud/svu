@@ -25,7 +25,18 @@ mod clear;
 
 use push::PushArgs;
 
-/// Stash away changes to a dirty working copy
+/// Stash away changes to a dirty working copy.
+///
+/// Use svu stash when you want to record the current state of the working directory,
+/// but want to go back to a clean working directory. The command saves your local
+/// modifications away and reverts the working directory.
+/// The modifications stashed away by this command can be listed with svu stash list,
+/// inspected with svu stash show, and restored (potentially on top of a different commit)
+/// with svu stash apply. Calling svu stash without any arguments is equivalent to svu stash push.
+///
+/// The latest stash you created is referenced as stash-0; older stashes are referenced as
+/// stash-1, stash-2, etc.  You can also reference a stash with just its index value.
+/// (eg. the integer n is equivalent to stash-n)
 #[derive(Debug, Parser)]
 #[command(
     author,

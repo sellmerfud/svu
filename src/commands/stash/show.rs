@@ -8,19 +8,18 @@ use std::env::current_dir;
 use std::io::{BufReader, BufRead};
 use pathdiff::diff_paths;
 
-/// Show the details of a stash entry
+/// Display the details of a stash entry.
 #[derive(Debug, Parser)]
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
 )]
 pub struct Show {
-    /// Show the patch output but do not update the working copy
-    /// or remove the stash entry
+    /// Show contents of the the patch that was used to create the stash entry.
     #[arg(short = 'd', long)]
     show_diff: bool,
 
-    /// Id of the stash you wish to apply and drop
+    /// Id of the stash entry you wish to display.
     #[arg(value_name = "STASH", value_parser = parse_stash_id, default_value = "stash-0")]
     stash_id: usize,
 }

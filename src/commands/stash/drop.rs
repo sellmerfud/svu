@@ -5,14 +5,14 @@ use super::*;
 use std::fs::remove_file;
 
 
-/// Remove a stash entry
+/// Remove a stash entry.
 #[derive(Debug, Parser)]
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
 )]
 pub struct Drop {
-    /// Id of the stash you wish to apply and drop
+    /// Id of the stash you wish to drop.
     #[arg(value_name = "STASH", value_parser = parse_stash_id, default_value = "stash-0")]
     stash_id: usize,
 }

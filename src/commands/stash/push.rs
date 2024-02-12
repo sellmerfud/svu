@@ -6,18 +6,28 @@ use super::*;
 use anyhow::Result;
 use uuid::Uuid;
 
-/// Push the working copy to the stash and revert the working copy
+/// Push the working copy to the stash and revert the working copy.
 #[derive(Debug, Args, Clone)]
 pub struct PushArgs {
-    /// A short description of the stash
+    /// A short description of the stash.
+    ///
+    /// This descriptionw is shown when you run svu stash list.  The description is appended to
+    /// the branch and revision from where the stash was created. If you do not supply a
+    /// description, the first line of commit message for the current working copy commit
+    /// is used by default.
     #[arg(short, long)]
     message: Option<String>,
 
-    /// Include unversioned files in the stash
+    /// Include unversioned files in the stash.
+    ///
+    /// Normally, unversioned files are not saved in the stash.
     #[arg(short, long)]
     unversioned: bool,
 
-    /// Do not revert the working copy
+    /// Do not revert the working copy.
+    /// 
+    /// Save the working copy changes, but leaave the working copy as is.  This can be
+    /// used to take a snapshot of your current changes.
     #[arg(short, long)]
     no_revert: bool,
 }

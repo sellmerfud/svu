@@ -4,14 +4,18 @@ use super::*;
 use anyhow::Result;
 use std::process;
 
-/// Replay a bisect session from a log file
+/// Replay a bisect session from a log file.
+///
+/// You can save the current bisect session log using the `svu bisect log` command and redirecting
+/// the output to a file.  Then, later, you can use `svu bisect replay` to reply the entire
+/// bisect session from the saved log file.
 #[derive(Debug, Parser)]
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
 )]
 pub struct Replay {
-    /// Path to log file
+    /// Path to log file.
     #[arg(num_args = 1..=1, required = true)]
     log_fiie: String,
 }

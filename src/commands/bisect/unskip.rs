@@ -4,7 +4,7 @@ use super::*;
 use anyhow::Result;
 use std::collections::HashSet;
 
-/// Reinstate previously skipped revisions
+/// Reinstate previously skipped revisions.
 #[derive(Debug, Parser)]
 #[command(
     author,

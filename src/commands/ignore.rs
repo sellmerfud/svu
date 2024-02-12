@@ -8,15 +8,16 @@ use crate::util::SvError::*;
 use std::path::Path;
 use std::fmt::Display;
 
-/// Print svn:ignore entries in .gitignore format
+/// Print svn:ignore and svn:global-ignores entries in .gitignore format.
 #[derive(Debug, Parser)]
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
     after_help = "\
-    Writes contents of all svn:ignore and svn:global-ignores properties\n\
-    to stdout in .gitignore format."
+    Recursively finds all svn:ignore and svn:global-ignores properties in the repository and \
+    writes them to stdout in .gitignore format."
 )]
+
 pub struct Ignore {
     /// Path to working Working copy directory.
     #[arg(default_value = ".")]

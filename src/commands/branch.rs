@@ -11,7 +11,15 @@ use crate::svn;
 use colored::*;
 use std::fmt::Display;
 
-/// Display current branch or list branches and tags
+/// Display current branch or list branches and tags.
+///
+/// With no options, this command will show the current branch checked
+/// out to your working copy.
+///
+/// With options it can be used to list all of the branches and/or tags in
+/// the repository. By default this is based on the standard repository structure
+/// (^/trunk, ^/branches, ^/tags) but see the `prefix` command if you are using
+/// non-standard prefixes for branches and tags.
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -22,19 +30,25 @@ use std::fmt::Display;
     Use -- to separate the PATH from --branches or --tags with no regex"
 )]
 pub struct Branch {
-    /// Display branches that match <REGEX>
+    /// Display branches that match <REGEX>.
+    ///
+    /// If multiple --branch options are given, then branches matching any
+    /// one of the regular expressions are listed.
     #[arg(short, long = "branch", value_name = "REGEX")]
     branch_regexes: Vec<Regex>,
 
-    /// Display tags that match <REGEX>
+    /// Display tags that match <REGEX>.
+    ///
+    /// If multiple --tag options are given, then tags matching any
+    /// one of the regular expressions are listed.
     #[arg(short, long = "tag", value_name = "REGEX")]
     tag_regexes: Vec<Regex>,
 
-    /// Display all branches in the repository
+    /// Display all branches in the repository.
     #[arg(short = 'B', long, conflicts_with = "branch_regexes")]
     all_branches: bool,
 
-    /// Display all tags in the repository
+    /// Display all tags in the repository.
     #[arg(short = 'T', long, conflicts_with = "tag_regexes")]
     all_tags: bool,
 

@@ -5,7 +5,7 @@ use anyhow::Result;
 use std::process;
 use std::collections::HashSet;
 
-/// Automate the bisect session by running a script
+/// Automate the bisect session by running a script.
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -16,7 +16,7 @@ use std::collections::HashSet;
     Any other exit code will abort the bisect process. It should be noted that a program that terminates\n\
     via exit(-1) leaves $? = 255, (see the exit(3) manual page), as the value is chopped with & 0377.\n\n\
    The special exit code 125 should be used when the current source code cannot be tested. If the script\n\
-   exits with this code, the current revision will be skipped (see git bisect skip above). 125 was chosen\n\
+   exits with this code, the current revision will be skipped (see `git bisect skip`). 125 was chosen\n\
    as the highest sensible value to use for this purpose, because 126 and 127 are used by POSIX shells to\n\
    signal specific error status (127 is for command not found, 126 is for command found but not executable\n\
    these details do not matter, as they are normal errors in the script, as far as bisect run is concerned)."

@@ -4,7 +4,7 @@ use super::*;
 use anyhow::Result;
 use std::fs::remove_file;
 
-/// Remove a stash entry and apply it to the working copy
+/// Remove a stash entry and apply it to the working copy.
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -16,7 +16,7 @@ pub struct Pop {
     #[arg(short = 'n', long)]
     dry_run: bool,
 
-    /// Id of the stash you wish to apply and drop
+    /// Id of the stash you wish to apply and drop.
     #[arg(value_name = "STASH", value_parser = parse_stash_id, default_value = "stash-0")]
     stash_id: usize,
 }

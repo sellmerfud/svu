@@ -4,7 +4,7 @@ use super::*;
 use anyhow::Result;
 use std::fs::remove_file;
 
-/// Clean up after a bisect session
+/// Clean up after a bisect session.
 #[derive(Debug, Parser)]
 #[command(
     author,

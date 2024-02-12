@@ -10,7 +10,11 @@ use crate::svn::{self, Prefixes, SvnInfo};
 use chrono::Local;
 use std::fmt::Display;
 
-/// Display commit revisions of files across tags and branches
+/// Display commit revisions of files across tags and branches.
+/// 
+/// By default this is based on the standard repository structure
+/// (^/trunk, ^/branches, ^/tags) but see the `prefix` command if you are using
+/// non-standard prefixes for branches and tags.
 #[derive(Debug, Parser)]
 #[command(
     visible_aliases = ["revs"],
@@ -23,10 +27,16 @@ use std::fmt::Display;
 )]
 pub struct Filerevs {
     /// Include branches that match <REGEX>
+    ///
+    /// If multiple --branch options are given, then branches matching any
+    /// one of the regular expressions are included.
     #[arg(short, long = "branch", value_name = "REGEX")]
     branch_regexes: Vec<Regex>,
 
     /// Include tags that match <REGEX>
+    ///
+    /// If multiple --tag options are given, then tags matching any
+    /// one of the regular expressions are included.
     #[arg(short, long = "tag", value_name = "REGEX")]
     tag_regexes: Vec<Regex>,
 

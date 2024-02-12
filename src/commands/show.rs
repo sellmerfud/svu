@@ -15,19 +15,23 @@ use crate::util;
     If no path is given it defaults to the current working copy directory."
 )]
 pub struct Show {
-    /// The commit revision
+    /// The commit revision.
+    ///
+    /// Revisions can be a numeric value or one of: HEAD, BASE, PREV, COMMITTED.
+    /// Additionally you can specify offsets such as HEAD-4 to show
+    /// the fifth most recent commit.
     #[arg(short, long, value_name = "REV")]
     revision: Option<String>,
 
-    /// Show the diff output of the commit
+    /// Show the diff output of the commit.
     #[arg(short = 'd', long)]
     show_diff: bool,
 
-    /// Display the date of each commit
+    /// Display the paths affected by the commit.
     #[arg(short = 'p', long)]
     show_paths: bool,
 
-    /// Display the date and time of each commit
+    /// Do not display the commit message.
     #[arg(short, long)]
     no_message: bool,
 

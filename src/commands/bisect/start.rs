@@ -7,29 +7,34 @@ use crate::util::display_svn_datetime;
 use super::*;
 use anyhow::Result;
 
-/// Start a bisect session in the working copy
+/// Start a bisect session in the working copy.
 #[derive(Debug, Parser)]
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
 )]
 pub struct Start {
-    /// A revision that is known to not contain the bug
+    /// A revision that is known to not contain the bug.
+    ///
+    /// You may omit this option and then subsequently use `svu bisect good`
+    /// to specify the revision.
     #[arg(short, long = "good", value_name = "REV")]
     good_rev: Option<String>,
 
-    /// A revision that is known to contain the bug
+    /// A revision that is known to contain the bug.
+    ///
+    /// You may omit this option and then subsequently use `svu bisect bad`
+    /// to specify the revision.
     #[arg(short, long = "bad", value_name = "REV")]
     bad_rev: Option<String>,
 
-    /// An alternate name for the 'good' subcommand
+    /// Specify an alternate name for the `svu bisect good` subcommand.
     #[arg(long, value_name = "TERM", value_parser = parse_term)]
     term_good: Option<String>,
 
-    /// An alternate name for the 'bad' subcommand
+    /// Specify an alternate name for the `svu bisect bad` subcommand.
     #[arg(long, value_name = "TERM", value_parser = parse_term)]
     term_bad: Option<String>,
-
 }
 
 impl Start {

@@ -4,7 +4,7 @@ use super::*;
 use anyhow::Result;
 use crate::svn;
 
-/// Display stash entries
+/// Display stash entries.
 #[derive(Debug, Parser)]
 #[command(
     author,

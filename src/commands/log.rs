@@ -9,7 +9,7 @@ use crate::util;
 use colored::*;
 use chrono::{DateTime, Local};
 
-/// Display formatted log entries
+/// Display formatted log entries.
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -33,10 +33,14 @@ pub struct Log {
     date: bool,
 
     /// Display the date and time of each commit
+    ///
+    /// Overrides the --date flag
     #[arg(short, long)]
     time: bool,
 
     /// Display the full commit message
+    ///
+    /// Without this only the first line of the commit message is displayed.
     #[arg(short, long)]
     full: bool,
 
@@ -45,6 +49,8 @@ pub struct Log {
     verbose: bool,
 
     /// Display commits incoming with next update
+    ///
+    /// Effectively a shorthand for -rHEAD:BASE
     #[arg(short, long)]
     incoming: bool,
 
@@ -61,10 +67,18 @@ pub struct Log {
     reverse: bool,
 
     /// Specify a revision or a range of revisions
+    ///
+    /// Revisions can be a numeric value or one of: HEAD, BASE, PREV, COMMITTED.
+    /// Additionally you can specify offsets such as HEAD-4 to start logging at
+    /// the fifth most recent commit.  A range is specified by separating two
+    /// revisions with a colon eg: HEAD-10:HEAD-30
     #[arg(short, long = "revision", value_name = "REV", num_args = 0.., conflicts_with = "incoming")]
     revisions: Vec<String>,
 
     /// Disply only commits with a matching message
+    ///
+    /// If more than one --match argument is given then commits with messages that
+    /// match any one of the regular expressions are included.
     #[arg(short = 'm', long = "match", value_name = "REGEX", num_args = 0..)]
     regexes: Vec<Regex>,
 

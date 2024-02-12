@@ -26,7 +26,7 @@ fn get_good_term() -> Option<&'static str> {
 }
 
 
-/// Mark a revision as good  (It does not contain the bug)
+/// Mark a revision as good  (It does not contain the bug).
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -34,7 +34,7 @@ fn get_good_term() -> Option<&'static str> {
     help_template = crate::app::HELP_TEMPLATE,
 )]
 pub struct Good {
-    /// The good revision. If omitted use the current working copy revison
+    /// The good revision. If omitted use the current working copy revison.
     #[arg(value_name = "REV")]
     revision: Option<String>,
 }

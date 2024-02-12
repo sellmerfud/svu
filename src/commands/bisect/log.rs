@@ -3,7 +3,7 @@ use clap::Parser;
 use super::*;
 use anyhow::Result;
 
-/// Print the bisect log to stdout
+/// Print the bisect log to stdout.
 #[derive(Debug, Parser)]
 #[command(
     author,

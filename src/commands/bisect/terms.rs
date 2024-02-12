@@ -3,12 +3,16 @@ use clap::Parser;
 use super::*;
 use anyhow::Result;
 
-/// Display the currently defined terms for good/bad
+/// Display the currently defined terms for `good` and  `bad`.
+///
+/// The terms `good` and `bad` can be redfined using options on the `svu bisect start` command.
+/// This allows you to tailor the terms to the type of change that you are searching for.
+/// Use `svu bisect terms` to display the current terms.
 #[derive(Debug, Parser)]
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
-    after_help = "If no options are specified, then both terms are displayed",
+    after_help = "If no options are specified, then both terms are displayed.",
 )]
 pub struct Terms {
     /// Display the term for the 'good' subcommand

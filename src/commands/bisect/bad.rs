@@ -25,7 +25,7 @@ fn get_bad_term() -> Option<&'static str> {
     }
 }
 
-/// Mark a revision as bad  (It contains the bug)
+/// Mark a revision as bad  (It contains the bug).
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -33,7 +33,7 @@ fn get_bad_term() -> Option<&'static str> {
     help_template = crate::app::HELP_TEMPLATE,
 )]
 pub struct Bad {
-    /// The bad revision. If omitted use the current working copy revison
+    /// The bad revision. If omitted use the current working copy revison.
     #[arg(value_name = "REV")]
     revision: Option<String>,
 }

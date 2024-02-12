@@ -5,7 +5,9 @@ use super::*;
 use anyhow::Result;
 use std::collections::HashSet;
 
-/// Skip revisions.  They will no longer be considered
+/// Skip revisions.  They will no longer be considered.
+///
+/// This can be used, for example, to skip a revision that does not build successfully.
 #[derive(Debug, Parser)]
 #[command(
     author,

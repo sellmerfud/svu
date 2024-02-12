@@ -4,7 +4,10 @@ use super::*;
 use anyhow::Result;
 use crate::svn;
 
-/// Apply a stash to the working copy
+/// Apply a stash to the working copy.
+/// 
+/// The stash entry is applied to the working copy but remains in the stash.
+/// To apply the stash and remove the entry use svu stash pop.
 #[derive(Debug, Parser)]
 #[command(
     author,
