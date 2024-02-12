@@ -12,13 +12,13 @@ use clap_complete::{generate, shells::Shell};
     help_template = crate::app::HELP_TEMPLATE,
 )]
 
-pub struct ShellCompletions {
+pub struct Completions {
     /// Target shell for completions.  Omit to use current shell.
     #[arg()]
     shell: Option<Shell>,
 }
 
-impl ShellCompletions {
+impl Completions {
     pub fn run(&mut self) -> Result<()> {
         let shell = self.shell
             .or(Shell::from_env())

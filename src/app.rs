@@ -42,7 +42,7 @@ pub enum Commands {
     Bisect(bisect::Bisect),
     Prefix(prefix::Prefix),
     Ignore(ignore::Ignore),
-    ShellCompletions(shell_completions::ShellCompletions),
+    Completions(completions::Completions),
 }
 
 use Commands::*;
@@ -58,7 +58,7 @@ impl Run for Commands{
             Bisect(cmd) => cmd.run(),
             Prefix(cmd) => cmd.run(),
             Ignore(cmd) => cmd.run(),
-            ShellCompletions(cmd) => cmd.run(),
+            Completions(cmd) => cmd.run(),
         }
     }
 }
