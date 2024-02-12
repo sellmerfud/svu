@@ -8,3 +8,4 @@ pub(crate) mod stash;
 pub(crate) mod bisect;
 pub(crate) mod prefix;
 pub(crate) mod ignore;
+pub(crate) mod shell_completions;

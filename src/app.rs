@@ -42,6 +42,7 @@ pub enum Commands {
     Bisect(bisect::Bisect),
     Prefix(prefix::Prefix),
     Ignore(ignore::Ignore),
+    ShellCompletions(shell_completions::ShellCompletions),
 }
 
 use Commands::*;
@@ -49,14 +50,15 @@ use Commands::*;
 impl Run for Commands{
     fn run(&mut self) -> Result<()> {
         match self {
-            Log(cmd)      => cmd.run(),
-            Branch(cmd)   => cmd.run(),
-            Show(cmd)     => cmd.run(),
+            Log(cmd) => cmd.run(),
+            Branch(cmd) => cmd.run(),
+            Show(cmd) => cmd.run(),
             Filerevs(cmd) => cmd.run(),
-            Stash(cmd)    => cmd.run(),
-            Bisect(cmd)   => cmd.run(),
-            Prefix(cmd)   => cmd.run(),
-            Ignore(cmd)   => cmd.run(),
+            Stash(cmd) => cmd.run(),
+            Bisect(cmd) => cmd.run(),
+            Prefix(cmd) => cmd.run(),
+            Ignore(cmd) => cmd.run(),
+            ShellCompletions(cmd) => cmd.run(),
         }
     }
 }
