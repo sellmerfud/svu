@@ -160,7 +160,7 @@ impl StashItem {
 }
 
 use crate::util::datetime_serializer;
-//  Stash entries saved to .sv/stash/stash_entries.json
+//  Stash entries saved to .svu/stash/stash_entries.json
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct StashFileEntry {
     branch: String,

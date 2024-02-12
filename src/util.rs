@@ -5,7 +5,7 @@ use colored::*;
 use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use std::sync::OnceLock;
 use std::path::PathBuf;
-use std::fs::create_dir;
+use std::fs::{create_dir, rename};
 use anyhow::Result;
 
 #[derive(Error, Debug)]
@@ -29,15 +29,22 @@ T: AsRef<str>,
     path
 }
 
-//  We create a .sv directory in the top directory of the working copy
+//  We create a .svu directory in the top directory of the working copy
 //  This gives sv commands a place to store data
 //  This will throw an error of the directory cannot be resloved.
+//  Previously we use .sv as the directory name, so if we find a .sv
+//  directory we rename it to .svu
 pub fn data_directory() -> Result<PathBuf> {
     let wc_info = svn::workingcopy_info()?; // Make sure we are in a working copy.
     let wc_root = PathBuf::from(wc_info.wc_path.unwrap());
-    let path = wc_root.join(".sv");
+    let path = wc_root.join(".svu");
     if !path.is_dir() {
-        create_dir(path.as_path())?
+        let prev_path = wc_root.join(".sv");
+        if prev_path.is_dir() {
+            rename(&prev_path, &path)?;
+        } else {
+            create_dir(&path)?
+        }
     }
     Ok(path)
 }
