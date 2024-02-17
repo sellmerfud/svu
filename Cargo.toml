@@ -19,3 +19,11 @@ uuid       = { version = "1.6.1", features = ["v4", "fast-rng"] }
 pathdiff   = "0.2.1"
 rpassword  = "7.3"
 rayon      = "1.8"
+
+# use LTO for smaller binaries (that take longer to build)
+[profile.release]
+lto = true         # Enable link-time optimization
+strip = true       # strip symbols from binary
+opt-level = 3      # maximum optimization passes
+codegen-units = 1  # Reduce number of codegen units to increase optimization
+panic = 'abort'    # Abort on panic, no rollback code included
