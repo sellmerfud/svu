@@ -149,7 +149,7 @@ pub(crate) mod datetime_serializer {
 }
 
 pub fn divider(len: usize) -> String {
-    vec!['-'; len].iter().collect()
+    "-".repeat(len)
 }
 
 //  Print formatted commit info to stdout.
