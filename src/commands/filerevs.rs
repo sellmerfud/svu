@@ -206,7 +206,7 @@ fn show_path_result(
     struct Entry(String, Option<Box<SvnInfo>>);
 
     let rel_path = &get_svn_rel_path(&path_entry.rel_url, sorted_prefixes)?;
-    let results = prefixes
+    let results: Vec<_> = prefixes
         .par_iter()
         .map(|prefix| {
             let path = join_paths(join_paths(root_url, prefix.as_str()), rel_path.as_str());
@@ -215,7 +215,7 @@ fn show_path_result(
                 .map(Box::new);
             Entry(prefix.clone(), info)
         })
-        .collect::<Vec<Entry>>();
+        .collect();
 
     const LOCATION: &str = "Location";
     const REVISION: &str = "Revision";
