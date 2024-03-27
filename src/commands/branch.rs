@@ -24,10 +24,6 @@ use std::fmt::Display;
 #[command(
     author,
     help_template = crate::app::HELP_TEMPLATE,
-    after_help = "\
-    If neither of --branches or --tags is present, the current branch is displayed.\n\
-    If no regex is specified for --branches or --tags then all are listed.\n\
-    Use -- to separate the PATH from --branches or --tags with no regex"
 )]
 pub struct Branch {
     /// Display branches that match <REGEX>.
