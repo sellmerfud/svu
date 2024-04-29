@@ -23,6 +23,7 @@ rayon      = "1.8"
 # use LTO for smaller binaries (that take longer to build)
 [profile.release]
 lto = true         # Enable link-time optimization
+debug = 0
 strip = true       # strip symbols from binary
 opt-level = 3      # maximum optimization passes
 codegen-units = 1  # Reduce number of codegen units to increase optimization
