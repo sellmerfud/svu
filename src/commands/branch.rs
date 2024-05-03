@@ -158,11 +158,12 @@ impl Branch {
         println!("{}", util::divider(60));
 
         for prefix in prefixes {
+            let relative_prefix = format!("^/{prefix}");
             let path_list = svn::path_list(creds, util::join_paths(base_url, prefix).as_str())?;
             for entry in path_list.entries {
-                let path = &util::join_paths(prefix, entry.name);
+                let path = &util::join_paths(&relative_prefix, entry.name);
                 if acceptable(path.as_str()) {
-                    println!("{}{}", "^/".green(), path.green());
+                    println!("{}", path.green());
                 }
             }
         }
