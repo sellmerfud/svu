@@ -61,6 +61,8 @@ impl Filerevs {
     fn show_results(&self) -> Result<()> {
         let creds = crate::auth::get_credentials()?;
 
+        let wc = svn::workingcopy_info()?;
+
         // First make sure all paths are rooted in the same repository
         let path_list = svn::info_list(&creds, &self.paths, None::<String>)?;
         let repo_uuid = &path_list[0].repo_uuid;
@@ -97,7 +99,7 @@ impl Filerevs {
         sorted_prefixes.sort_by(|a, b| a.len().cmp(&b.len()).reverse()); // Sorteed by length longest first.
 
         for path_entry in &path_list {
-            show_path_result(&creds, root_url, path_entry, &prefixes, &sorted_prefixes)?;
+            show_path_result(&creds, &wc, root_url, path_entry, &prefixes, &sorted_prefixes)?;
         }
         Ok(())
     }
@@ -172,12 +174,12 @@ impl Filerevs {
 //  to its subversion prefix.
 //  Find find the url entry for one of our prefixes
 //  so we can determine where the relative path starts.
-fn get_svn_rel_path<S>(rel_url: &str, sorted_prefixes: &[S]) -> Result<String>
+fn get_svn_rel_path<S>(rel_url: &str, test_prefixes: &[S]) -> Result<String>
 where
     S: AsRef<str> + Display,
 {
     // Skip the leading ^/
-    sorted_prefixes
+    test_prefixes
         .iter()
         .find(|p| rel_url[2..].starts_with(p.as_ref()))
         .map(|p| rel_url[p.as_ref().len() + 3..].to_string())
@@ -196,6 +198,7 @@ fn max_width(label: &str, value_widths: impl Iterator<Item = usize>) -> usize {
 // tags/8.1.1-GA       7625
 fn show_path_result(
     creds: &Option<Credentials>,
+    wc: &SvnInfo,
     root_url: &str,
     path_entry: &SvnInfo,
     prefixes: &[String],
@@ -205,7 +208,13 @@ fn show_path_result(
 
     struct Entry(String, Option<Box<SvnInfo>>);
 
-    let rel_path = &get_svn_rel_path(&path_entry.rel_url, sorted_prefixes)?;
+    // Add the relative path of the working copy to the prefixes
+    // for deterining the relative path
+    let mut test_prefixes: Vec<String> = sorted_prefixes.to_vec();
+    test_prefixes.insert(0, wc.rel_url[2..].to_owned());
+
+
+    let rel_path = &get_svn_rel_path(&path_entry.rel_url, &test_prefixes)?;
     let results: Vec<_> = prefixes
         .par_iter()
         .map(|prefix| {
