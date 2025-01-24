@@ -119,16 +119,16 @@ impl Filerevs {
             all_prefixes.extend(prefixes.tag_prefixes.clone());
             let mut branch_prefixes = prefixes.branch_prefixes.clone();
             branch_prefixes.sort();
-            let acceptable = |branch: &String| -> bool {
+            let acceptable = |branch: &String, name: &String| -> bool {
                 !all_prefixes.contains(branch)
-                    && (all || regexes.iter().any(|re| re.is_match(branch)))
+                    && (all || regexes.iter().any(|re| re.is_match(name)))
             };
 
             for prefix in &branch_prefixes {
                 let path_list = svn::path_list(creds, &join_paths(root_url, prefix))?;
                 for entry in &path_list.entries {
                     let branch = join_paths(prefix, &entry.name);
-                    if acceptable(&branch) {
+                    if acceptable(&branch, &entry.name) {
                         branches.push(branch);
                     }
                 }
@@ -151,16 +151,16 @@ impl Filerevs {
             all_prefixes.extend(prefixes.tag_prefixes.clone());
             let mut tag_prefixes = prefixes.tag_prefixes.clone();
             tag_prefixes.sort();
-            let acceptable = |tag: &String| -> bool {
+            let acceptable = |tag: &String, name: &String| -> bool {
                 !all_prefixes.contains(tag)
-                    && (all || regexes.iter().any(|re| re.is_match(tag)))
+                    && (all || regexes.iter().any(|re| re.is_match(name)))
             };
 
             for prefix in &tag_prefixes {
                 let path_list = svn::path_list(creds, &join_paths(root_url, prefix))?;
                 for entry in &path_list.entries {
                     let tag = join_paths(prefix, &entry.name);
-                    if acceptable(&tag) {
+                    if acceptable(&tag, &entry.name) {
                         tags.push(tag);
                     }
                 }
@@ -248,7 +248,6 @@ fn show_path_result(
     test_prefixes.insert(0, wc.rel_url[2..].to_owned());
 
     let (path_entry, rel_path) = path_pair;
-    println!("DEBUG: rel_path={}, {}", rel_path, path_entry.rel_url);
     let results: Vec<_> = prefixes
         .par_iter()
         .map(|prefix| {

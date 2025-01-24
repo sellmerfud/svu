@@ -148,9 +148,9 @@ impl Branch {
     {
         //  If a path matches one of the branch/tag prefixes then we do not consider it
         //  an acceptable entry.  Also the entry must match the regex if present.
-        let acceptable = |path: &str| -> bool {
+        let acceptable = |path: &str, name: &str| -> bool {
             !all_prefixes.iter().any(|p| p.eq(path))
-                && (regexes.is_empty() || regexes.iter().any(|r| r.is_match(path)))
+                && (regexes.is_empty() || regexes.iter().any(|r| r.is_match(name)))
         };
 
         println!();
@@ -161,8 +161,8 @@ impl Branch {
             let relative_prefix = format!("^/{prefix}");
             let path_list = svn::path_list(creds, util::join_paths(base_url, prefix).as_str())?;
             for entry in path_list.entries {
-                let path = &util::join_paths(&relative_prefix, entry.name);
-                if acceptable(path.as_str()) {
+                let path = &util::join_paths(&relative_prefix, &entry.name);
+                if acceptable(path.as_str(), &entry.name) {
                     println!("{}", path.green());
                 }
             }
