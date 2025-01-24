@@ -73,9 +73,10 @@ impl Filerevs {
                 );
             }
         }
-
-        let root_url = &path_list[0].root_url;
+        // We now get the relative path of each path in the list
         let prefix_info = svn::load_prefixes()?;
+        let path_pairs = get_relative_paths(&path_list, &prefix_info)?;
+        let root_url = &path_list[0].root_url;
         let branches = self.get_branches(
             &creds,
             root_url,
@@ -98,8 +99,8 @@ impl Filerevs {
         let mut sorted_prefixes = prefixes.clone();
         sorted_prefixes.sort_by(|a, b| a.len().cmp(&b.len()).reverse()); // Sorteed by length longest first.
 
-        for path_entry in &path_list {
-            show_path_result(&creds, &wc, root_url, path_entry, &prefixes, &sorted_prefixes)?;
+        for path_pair in &path_pairs {
+            show_path_result(&creds, &wc, root_url, path_pair, &prefixes, &sorted_prefixes)?;
         }
         Ok(())
     }
@@ -170,20 +171,53 @@ impl Filerevs {
 }
 
 
+//  For each path in the list determine the portion of the
+//  path that is relative to a given prefix.
+//  where 
+//  to its subversion prefix.
+//  Find find the url entry for one of our prefixes
+//  so we can determine where the relative path starts.
+fn get_relative_paths(path_list: &[SvnInfo], prefixes: &Prefixes) -> Result<Vec<(SvnInfo, String)>>
+{
+    let mut pairs = vec!();
+    let mut other_prefixes = prefixes.branch_prefixes.iter()
+        .chain(prefixes.tag_prefixes.iter())
+        .cloned()
+        .collect::<Vec<String>>();
+    other_prefixes.sort();
+    
+    for path in path_list {
+        let rel_path = get_svn_rel_path(&path.rel_url, &prefixes.trunk_prefix, &other_prefixes)?;
+        pairs.push((path.clone(), rel_path));
+    }
+    Ok(pairs)
+}
 //  We must determine the path to the file relative
 //  to its subversion prefix.
 //  Find find the url entry for one of our prefixes
 //  so we can determine where the relative path starts.
-fn get_svn_rel_path<S>(rel_url: &str, test_prefixes: &[S]) -> Result<String>
+fn get_svn_rel_path<S>(rel_url: &str, trunk_prefix: &str, other_prefixes: &[S]) -> Result<String>
 where
     S: AsRef<str> + Display,
 {
-    // Skip the leading ^/
-    test_prefixes
-        .iter()
-        .find(|p| rel_url[2..].starts_with(p.as_ref()))
-        .map(|p| rel_url[p.as_ref().len() + 3..].to_string())
-        .ok_or(General(format!("Cannot determine relative path for {}", rel_url)).into())
+    if rel_url[2..].starts_with(trunk_prefix) {
+        // We skip the trunk prefix and trailing /
+        // ^/trunk/<rel-path>
+        Ok(rel_url[trunk_prefix.len() + 3..].to_string())
+    }
+    else {
+        // For the branch/tags prefixes we must also skip the first node of the
+        // path following the prefix (ie. the branch name or tag name) and it's trailiing slash:
+        // ^/branches/8.2/<rel-path>
+        other_prefixes
+            .iter()
+            .find(|p| rel_url[2..].starts_with(p.as_ref()))
+            .map(|p| {
+                let sep = rel_url[p.as_ref().len() + 3..].find('/').unwrap();
+                rel_url[p.as_ref().len() + 3 + sep + 1..].to_string()
+            })
+            .ok_or(General(format!("Cannot determine relative path for {}", rel_url)).into())
+    }
 }
 
 fn max_width(label: &str, value_widths: impl Iterator<Item = usize>) -> usize {
@@ -200,7 +234,7 @@ fn show_path_result(
     creds: &Option<Credentials>,
     wc: &SvnInfo,
     root_url: &str,
-    path_entry: &SvnInfo,
+    path_pair: &(SvnInfo, String),
     prefixes: &[String],
     sorted_prefixes: &[String]
 ) -> Result<()> {
@@ -213,8 +247,8 @@ fn show_path_result(
     let mut test_prefixes: Vec<String> = sorted_prefixes.to_vec();
     test_prefixes.insert(0, wc.rel_url[2..].to_owned());
 
-
-    let rel_path = &get_svn_rel_path(&path_entry.rel_url, &test_prefixes)?;
+    let (path_entry, rel_path) = path_pair;
+    println!("DEBUG: rel_path={}, {}", rel_path, path_entry.rel_url);
     let results: Vec<_> = prefixes
         .par_iter()
         .map(|prefix| {
